@@ -1,0 +1,81 @@
+graph LR
+    subgraph "Phase 1: Research & Development"
+        A[Strategy Idea & Hypothesis] --> B[Data Collection & Preparation]
+        B --> C[Exploratory Data Analysis]
+        C --> D[Feature Engineering]
+        D --> E[Initial Strategy Development]
+        E --> F[Data Splitting Strategy]
+        F --> G[Training Set<br/>~60% of data]
+        F --> H[Validation Set<br/>~20% of data]
+        F --> I[Test Set<br/>~20% of data]
+    end
+    
+    subgraph "Phase 2: Parameter Optimization"
+        G --> J[Parameter Space Definition]
+        J --> K[Grid Search / Optimization<br/>Randomized Search<br/>Bayesian Optimization]
+        K --> L[Cross-Validation on Training]
+        L --> M{Performance<br/>Criteria Met?}
+        M -->|No| N[Refine Strategy Logic]
+        N --> E
+        M -->|Yes| O[Validation Phase]
+    end
+    
+    subgraph "Phase 3: Validation & Robustness"
+        O --> P[Test on Validation Set]
+        P --> Q[Multi-Metric Evaluation]
+        Q --> R[Sharpe Ratio & Max Drawdown<br/>Win Rate & Calmar Ratio<br/>Sortino Ratio]
+        R --> W[Robustness Testing]
+        W --> X[Parameter Sensitivity Analysis]
+        X --> Y[Monte Carlo Simulation]
+        Y --> Z[Bootstrap Analysis]
+        Z --> AA[Walk-Forward Analysis]
+        AA --> BB{Validation<br/>Results Satisfactory?}
+        BB -->|No| CC[Parameter Adjustment<br/>Caution: This could lead to overfitting<br/>Alternative: Go back to Grid Search or even Initial Strategy Development]
+        CC --> O
+        BB -->|Yes| DD[Final Testing Phase]
+    end
+    
+    subgraph "Phase 4: Final Testing & Finalization"
+        DD --> EE[Test on Unseen Data]
+        EE --> FF[Statistical Significance Tests]
+        FF --> GG[Transaction Cost Analysis]
+        GG --> HH[Slippage & Spread Impact]
+        HH --> II{Final Performance<br/>Acceptable?}
+        II -->|No| JJ[Strategy Refinement]
+        JJ --> E
+        II -->|Yes| KK[Strategy Finalization]
+        KK --> LL[Documentation & Reporting]
+        LL --> MM[Risk Management Rules<br/>Position Sizing Logic<br/>Stop Loss & Take Profit]
+    end
+    
+    subgraph "Phase 5: Implementation & Monitoring"
+        MM --> PP[Paper Trading Phase]
+        PP --> QQ[Real-time Performance Monitor]
+        QQ --> RR{Paper Trading<br/>Results Aligned?}
+        RR -->|No| SS[Debug & Adjust]
+        SS --> PP
+        RR -->|Yes| TT[Live Trading Preparation]
+        TT --> UU[Risk Controls Implementation<br/>Monitoring Dashboard<br/>Alert System Setup]
+        UU --> XX[Live Trading Deployment]
+        XX --> YY[Continuous Monitoring]
+        YY --> ZZ[Performance Degradation Check]
+        ZZ --> AAA{Strategy Still<br/>Performing?}
+        AAA -->|Yes| YY
+        AAA -->|No| BBB[Strategy Review & Update]
+        BBB --> CCC[Re-optimization Cycle]
+        CCC --> G
+    end
+    
+    classDef dataPhase fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000000
+    classDef developmentPhase fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000000
+    classDef validationPhase fill:#e8f5e8,stroke:#388e3c,stroke-width:2px,color:#000000
+    classDef testingPhase fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000000
+    classDef productionPhase fill:#ffebee,stroke:#d32f2f,stroke-width:2px,color:#000000
+    classDef decisionPoint fill:#fff9c4,stroke:#f9a825,stroke-width:3px,color:#000000
+    
+    class A,B,C,D dataPhase
+    class E,F,G,H,I,J,K,L,N developmentPhase
+    class O,P,Q,R,S,T,U,V,W,X,Y,Z,AA,CC validationPhase
+    class DD,EE,FF,GG,HH,JJ,KK,LL,MM,NN,OO testingPhase
+    class PP,QQ,SS,TT,UU,VV,WW,XX,YY,ZZ,BBB,CCC productionPhase
+    class M,BB,II,RR,AAA decisionPoint

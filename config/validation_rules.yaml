@@ -1,0 +1,63 @@
+validation_criteria:
+  performance_metrics:
+    minimum_sharpe_ratio: 1.0
+    maximum_drawdown_pct: 20.0
+    minimum_calmar_ratio: 0.5
+    minimum_sortino_ratio: 1.2
+    minimum_omega_ratio: 1.3
+    minimum_profit_factor: 1.5
+    minimum_win_rate_pct: 40.0
+    minimum_trades: 100
+    maximum_correlation_with_benchmark: 0.8
+  
+  statistical_tests:
+    significance_level: 0.05
+    bootstrap_samples: 1000
+    monte_carlo_simulations: 10000
+    confidence_interval: 0.95
+    minimum_information_ratio: 0.5
+  
+  robustness_tests:
+    parameter_sensitivity:
+      max_performance_degradation_pct: 30.0
+      parameter_variation_pct: 10.0
+    
+    regime_analysis:
+      minimum_regimes_tested: 3
+      minimum_performance_consistency: 0.7
+    
+    walk_forward:
+      minimum_windows: 10
+      reoptimization_frequency_months: 6
+      minimum_out_of_sample_performance_ratio: 0.8
+  
+  risk_management:
+    maximum_portfolio_var_95: 0.05  # 5% daily VaR
+    maximum_leverage: 3.0
+    minimum_diversification_ratio: 0.3
+    maximum_single_position_weight: 0.10
+    maximum_sector_concentration: 0.25
+  
+  transaction_costs:
+    realistic_spread_bps: 10  # 10 basis points
+    commission_per_trade: 5.0  # USD
+    market_impact_coefficient: 0.01
+    slippage_tolerance_bps: 20
+
+strategy_validation:
+  data_requirements:
+    minimum_history_years: 2
+    minimum_data_points: 1000
+    required_data_quality_score: 0.95
+  
+  backtesting_standards:
+    walk_forward_enabled: true
+    cross_validation_folds: 5
+    out_of_sample_period_months: 6
+    paper_trading_period_months: 3
+  
+  go_live_criteria:
+    minimum_paper_trading_sharpe: 1.5
+    maximum_paper_trading_drawdown: 10.0
+    minimum_live_ready_score: 85.0
+    required_stress_test_pass_rate: 90.0

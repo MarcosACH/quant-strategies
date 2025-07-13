@@ -1,0 +1,64 @@
+data_sources:
+  yfinance:
+    enabled: true
+    rate_limit: 2000  # requests per hour
+    timeout: 30  # seconds
+    retry_attempts: 3
+    supported_intervals:
+      - "1m"
+      - "5m"
+      - "15m"
+      - "30m"
+      - "1h"
+      - "1d"
+      - "1wk"
+      - "1mo"
+  
+  alpha_vantage:
+    enabled: true
+    api_key_env: "ALPHA_VANTAGE_API_KEY"
+    rate_limit: 500  # requests per day
+    timeout: 30
+    retry_attempts: 3
+    base_url: "https://www.alphavantage.co/query"
+    supported_functions:
+      - "TIME_SERIES_INTRADAY"
+      - "TIME_SERIES_DAILY"
+      - "TIME_SERIES_WEEKLY"
+      - "TIME_SERIES_MONTHLY"
+  
+  polygon:
+    enabled: false
+    api_key_env: "POLYGON_API_KEY"
+    rate_limit: 5  # requests per minute (free tier)
+    timeout: 30
+    retry_attempts: 3
+    base_url: "https://api.polygon.io"
+  
+  ccxt:
+    enabled: true
+    exchanges:
+      binance:
+        sandbox: true
+        rate_limit: 1200  # requests per minute
+        timeout: 30000  # milliseconds
+      okx:
+        sandbox: true
+        rate_limit: 600
+        timeout: 30000
+      bybit:
+        sandbox: true
+        rate_limit: 120
+        timeout: 30000
+
+cache_settings:
+  enabled: true
+  ttl_hours: 24
+  max_size_mb: 1000
+  compression: true
+
+quality_checks:
+  max_missing_data_pct: 5.0
+  min_volume_threshold: 1000
+  price_gap_threshold: 0.20  # 20% price gap detection
+  outlier_std_threshold: 5.0
