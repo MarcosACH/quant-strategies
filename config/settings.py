@@ -48,8 +48,9 @@ class Settings:
             "LOG_FORMAT", "{time:YYYY-MM-DD HH:mm:ss} | {level} | {name} | {message}")
 
         # Data Storage
-        self.DATA_ROOT_PATH = Path(os.getenv("DATA_ROOT_PATH", "data/"))
-        self.RESULTS_ROOT_PATH = Path(
+        self.DATA_ROOT_PATH = self.project_root / \
+            Path(os.getenv("DATA_ROOT_PATH", "data/"))
+        self.RESULTS_ROOT_PATH = self.project_root / Path(
             os.getenv("RESULTS_ROOT_PATH", "results/"))
         self.CACHE_ENABLED = os.getenv(
             "CACHE_ENABLED", "true").lower() == "true"
