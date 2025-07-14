@@ -1,7 +1,7 @@
 import gc
 import itertools
 import numpy as np
-import pandas as pd
+import polars as pl
 import vectorbt as vbt
 from typing import Optional, List, Dict, Any, Iterator, Callable
 from joblib import Parallel, delayed
@@ -45,7 +45,7 @@ class VectorBTEngine:
     def simulate_portfolios(
         self,
         strategy,
-        data: pd.DataFrame,
+        data: pl.DataFrame,
         param_dict: Dict[str, Any],
         ticker: str,
         sizing_method: str = "Value-based",
@@ -60,7 +60,7 @@ class VectorBTEngine:
         date_range: str = "undefined_date_range",
         stats_subset: Optional[List[str]] = None,
         save_results: bool = True
-    ) -> pd.DataFrame:
+    ) -> pl.DataFrame:
         """
         Run portfolio simulation for a strategy with parameter optimization.
 
@@ -112,11 +112,11 @@ class VectorBTEngine:
             )
             print(f"Results will be saved to: {filepath}")
 
-        open_prices = data["open"].to_numpy(dtype=np.float64)
-        high_prices = data["high"].to_numpy(dtype=np.float64)
-        low_prices = data["low"].to_numpy(dtype=np.float64)
-        close_prices = data["close"].to_numpy(dtype=np.float64)
-        volume = data["volume"].to_numpy(dtype=np.float64)
+        open_prices = data["open"].to_numpy()
+        high_prices = data["high"].to_numpy()
+        low_prices = data["low"].to_numpy()
+        close_prices = data["close"].to_numpy()
+        volume = data["volume"].to_numpy()
 
         indicator = strategy.create_indicator()
         order_func_nb = strategy.get_order_func_nb()
@@ -162,7 +162,7 @@ class VectorBTEngine:
 
         print(f"All batches processed. Total combinations: {total_processed}")
 
-        final_results = pd.DataFrame(results)
+        final_results = pl.DataFrame(results)
 
         return final_results
 
@@ -363,7 +363,7 @@ class VectorBTEngine:
 
     def _save_batch_results(self, batch_results: List[Dict], filepath: str, is_first_batch: bool):
         """Save batch results to CSV file."""
-        batch_df = pd.DataFrame(batch_results)
+        batch_df = pl.DataFrame(batch_results)
 
         if is_first_batch:
             batch_df.to_csv(filepath, index=False,
@@ -372,7 +372,7 @@ class VectorBTEngine:
             batch_df.to_csv(filepath, index=False,
                             float_format="%.6f", mode="a", header=False)
 
-    def load_results(self, filepath: str) -> pd.DataFrame:
+    def load_results(self, filepath: str) -> pl.DataFrame:
         """Load results from CSV file with optimized dtypes."""
         try:
             dtype_hints = {
@@ -390,9 +390,9 @@ class VectorBTEngine:
                 "sortino_ratio": "float32"
             }
 
-            return pd.read_csv(filepath, dtype=dtype_hints)
+            return pl.read_csv(filepath, dtype=dtype_hints)
 
         except Exception as e:
             print(
                 f"Warning: Could not optimize dtypes ({e}). Loading with default types...")
-            return pd.read_csv(filepath)
+            return pl.read_csv(filepath)

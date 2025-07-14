@@ -1,9 +1,9 @@
 import numpy as np
-import pandas as pd
+import polars as pl
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pathlib import Path
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Dict
 import vectorbt as vbt
 from config.settings import settings
 
@@ -21,7 +21,7 @@ class PortfolioAnalyzer:
 
     def print_results(
         self,
-        results: pd.DataFrame,
+        results: pl.DataFrame,
         result_nr: Optional[int] = None,
         columns: List[str] = None
     ) -> None:
@@ -125,7 +125,7 @@ class PortfolioAnalyzer:
 
     def plot_portfolio(
         self,
-        data: pd.DataFrame,
+        data: pl.DataFrame,
         indicator: Any,
         portfolio: vbt.Portfolio,
         strat_name: str,
@@ -154,11 +154,9 @@ class PortfolioAnalyzer:
         """
         bar_index = np.arange(len(data))
 
-        # Extract indicator data
         volume_delta = indicator.volume_delta.values
         atr_values = indicator.atr.values
 
-        # Create subplots
         fig = make_subplots(
             rows=6, cols=1,
             subplot_titles=(
@@ -172,13 +170,11 @@ class PortfolioAnalyzer:
             vertical_spacing=0.08
         )
 
-        # Add price and trades plot
         portfolio_fig = portfolio.plot_trades(width=width, height=height)
         for trace in portfolio_fig.data:
             trace.showlegend = True
             fig.add_trace(trace, row=1, col=1)
 
-        # Add shapes (trade markers) if they exist
         if portfolio_fig.layout.shapes:
             for shape in portfolio_fig.layout.shapes:
                 shape_dict = shape.to_plotly_json()
@@ -186,7 +182,6 @@ class PortfolioAnalyzer:
                 shape_dict["yref"] = "y"
                 fig.add_shape(shape_dict, row=1, col=1)
 
-        # Add OHLC if requested
         if use_ohlc:
             fig.add_trace(
                 go.Candlestick(
@@ -201,7 +196,6 @@ class PortfolioAnalyzer:
                 row=1, col=1
             )
 
-        # Add CVD and Bollinger Bands
         fig.add_trace(go.Scatter(
             x=bar_index,
             y=indicator.cumulative_volume_delta.values,
@@ -231,7 +225,6 @@ class PortfolioAnalyzer:
             showlegend=True
         ), row=2, col=1)
 
-        # Add volume delta bars
         fig.add_trace(go.Bar(
             x=bar_index[volume_delta >= 0],
             y=volume_delta[volume_delta >= 0],
@@ -253,7 +246,6 @@ class PortfolioAnalyzer:
         fig.add_hline(y=0, line_dash="dash", line_color="black",
                       line_width=1, row=3, col=1)
 
-        # Add ATR
         fig.add_trace(go.Scatter(
             x=bar_index,
             y=atr_values,
@@ -263,7 +255,6 @@ class PortfolioAnalyzer:
             showlegend=True
         ), row=4, col=1)
 
-        # Add trade PnL
         trades_fig = portfolio.plot_trade_pnl(width=width, height=height)
         for trace in trades_fig.data:
             trace.showlegend = True
@@ -271,13 +262,11 @@ class PortfolioAnalyzer:
                 trace.y = [y * 100 for y in trace.y]  # Convert to percentage
             fig.add_trace(trace, row=5, col=1)
 
-        # Add portfolio value
         value_fig = portfolio.plot_value(width=width, height=height)
         for trace in value_fig.data:
             trace.showlegend = True
             fig.add_trace(trace, row=6, col=1)
 
-        # Update layout
         fig.update_layout(
             title=f"{strat_name.replace('_', ' ').capitalize()} Results",
             width=width,
@@ -287,15 +276,12 @@ class PortfolioAnalyzer:
             dragmode="pan"
         )
 
-        # Update axes
         fig.update_xaxes(title_text="Bar Number", row=6, col=1)
         fig.update_xaxes(fixedrange=False)
 
-        # Link x-axes
         for row in range(1, 7):
             fig.update_xaxes(matches="x", row=row, col=1)
 
-        # Update y-axis titles
         fig.update_yaxes(title_text="Price", row=1, col=1, fixedrange=False)
         fig.update_yaxes(title_text="Cumulative Volume Delta",
                          row=2, col=1, fixedrange=False)
@@ -308,7 +294,6 @@ class PortfolioAnalyzer:
         fig.update_yaxes(title_text="Value ($)", row=6,
                          col=1, fixedrange=False)
 
-        # Save plot if requested
         if save_plot:
             if save_path is None:
                 save_path = self.results_path / "plots" / \
@@ -323,7 +308,7 @@ class PortfolioAnalyzer:
 
     def generate_performance_report(
         self,
-        results: pd.DataFrame,
+        results: pl.DataFrame,
         strategy_name: str,
         save_report: bool = True
     ) -> Dict[str, Any]:
@@ -347,7 +332,6 @@ class PortfolioAnalyzer:
             "optimization_insights": {}
         }
 
-        # Performance summary
         if "sharpe_ratio" in results.columns:
             report["performance_summary"]["avg_sharpe"] = results["sharpe_ratio"].mean()
             report["performance_summary"]["best_sharpe"] = results["sharpe_ratio"].max()
@@ -362,7 +346,6 @@ class PortfolioAnalyzer:
             report["performance_summary"]["avg_drawdown"] = results["max_drawdown_pct"].mean()
             report["performance_summary"]["worst_drawdown"] = results["max_drawdown_pct"].max()
 
-        # Top performers
         if "sharpe_ratio" in results.columns:
             top_sharpe = results.nlargest(5, "sharpe_ratio")
             report["top_performers"]["by_sharpe"] = top_sharpe.to_dict(
@@ -373,9 +356,7 @@ class PortfolioAnalyzer:
             report["top_performers"]["by_return"] = top_returns.to_dict(
                 "records")
 
-        # Risk analysis
         if "max_drawdown_pct" in results.columns and "total_return_pct" in results.columns:
-            # Calculate risk-adjusted returns
             results_copy = results.copy()
             results_copy["risk_adjusted_return"] = (
                 results_copy["total_return_pct"] /
@@ -385,7 +366,6 @@ class PortfolioAnalyzer:
             report["risk_analysis"]["top_risk_adjusted"] = top_risk_adj.to_dict(
                 "records")
 
-        # Save report if requested
         if save_report:
             report_path = self.results_path / "reports" / \
                 f"{strategy_name}_performance_report.json"
@@ -401,9 +381,9 @@ class PortfolioAnalyzer:
 
     def compare_strategies(
         self,
-        results_dict: Dict[str, pd.DataFrame],
+        results_dict: Dict[str, pl.DataFrame],
         metrics: List[str] = None
-    ) -> pd.DataFrame:
+    ) -> pl.DataFrame:
         """
         Compare performance across multiple strategies.
 
@@ -431,4 +411,4 @@ class PortfolioAnalyzer:
 
             comparison_data.append(strategy_summary)
 
-        return pd.DataFrame(comparison_data)
+        return pl.DataFrame(comparison_data)
