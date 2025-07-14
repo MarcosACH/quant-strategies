@@ -6,7 +6,7 @@ using parquet data files from the data directory.
 """
 
 import sys
-import pandas as pd
+import polars as pl
 import numpy as np
 from pathlib import Path
 import time
@@ -24,14 +24,13 @@ except ImportError as e:
     sys.exit(1)
 
 
-def load_parquet_data(file_path: Path) -> pd.DataFrame:
+def load_parquet_data(file_path: Path) -> pl.DataFrame:
     """Load and validate parquet data file."""
     if not file_path.exists():
         raise FileNotFoundError(f"Data file not found: {file_path}")
 
-    data = pd.read_parquet(file_path)
+    data = pl.read_parquet(file_path)
 
-    # Ensure required columns exist
     required_columns = ['open', 'high', 'low', 'close', 'volume']
     missing_columns = [
         col for col in required_columns if col not in data.columns]
@@ -39,20 +38,20 @@ def load_parquet_data(file_path: Path) -> pd.DataFrame:
         raise ValueError(f"Missing required columns: {missing_columns}")
 
     print(f"Loaded data: {data.shape[0]:,} rows, {data.shape[1]} columns")
-    print(f"Date range: {data.index.min()} to {data.index.max()}")
+    print(f"Date range: {data["datetime"].min()} to {data["datetime"].max()}")
 
     return data
 
 
 def run_backtest(
-    data: pd.DataFrame,
+    data: pl.DataFrame,
     param_ranges: dict,
     initial_cash: float = 1000,
     fee_pct: float = 0.05,
     risk_pct: float = 1.0,
     ticker: str = "BTC-USDT-PERP",
     exchange: str = "okx"
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     """Run the backtest with specified parameters."""
 
     strategy = CVDBBPullbackStrategy()
@@ -64,8 +63,8 @@ def run_backtest(
 
     print(f"Starting backtest...")
 
-    start_date = data.index.min().strftime("%Y%m%d")
-    end_date = data.index.max().strftime("%Y%m%d")
+    start_date = data["datetime"].min().strftime("%Y%m%d")
+    end_date = data["datetime"].max().strftime("%Y%m%d")
     date_range = f"{start_date}_{end_date}"
 
     results = engine.simulate_portfolios(
@@ -84,15 +83,15 @@ def run_backtest(
     return results
 
 
-def analyze_results(results: pd.DataFrame) -> None:
+def analyze_results(results: pl.DataFrame) -> None:
     """Analyze and display backtest results."""
     print(f"\nBACKTEST RESULTS SUMMARY")
     print(f"{'='*50}")
     print(f"Total parameter combinations tested: {len(results):,}")
 
     print(f"\nTOP 5 STRATEGIES BY SHARPE RATIO:")
-    top_sharpe = results.nlargest(5, 'sharpe_ratio')
-    for i, (idx, row) in enumerate(top_sharpe.iterrows(), 1):
+    top_sharpe = results.top_k(5, by='sharpe_ratio')
+    for i, row in enumerate(top_sharpe.iter_rows(named=True), 1):
         print(f"{i}. Sharpe: {row['sharpe_ratio']:.3f} | "
               f"Return: {row['total_return_pct']:.1f}% | "
               f"DD: {row['max_drawdown_pct']:.1f}% | "
@@ -100,8 +99,8 @@ def analyze_results(results: pd.DataFrame) -> None:
               f"WR: {row['win_rate_pct']:.1f}%")
 
     print(f"\nTOP 5 STRATEGIES BY TOTAL RETURN:")
-    top_return = results.nlargest(5, 'total_return_pct')
-    for i, (idx, row) in enumerate(top_return.iterrows(), 1):
+    top_return = results.top_k(5, by='total_return_pct')
+    for i, row in enumerate(top_return.iter_rows(named=True), 1):
         print(f"{i}. Return: {row['total_return_pct']:.1f}% | "
               f"Sharpe: {row['sharpe_ratio']:.3f} | "
               f"DD: {row['max_drawdown_pct']:.1f}% | "
@@ -120,41 +119,36 @@ def main():
     data_path = settings.DATA_ROOT_PATH / "processed" / \
         "features" / "okx_btc_usdt_perp_1m_2022_10_27-2022_12_27.parquet"
 
-    try:
-        data = load_parquet_data(data_path)
+    data = load_parquet_data(data_path)
 
-        strategy = CVDBBPullbackStrategy()
-        # param_ranges = strategy.param_ranges
-        param_ranges_small = {
-            "bbands_length": np.arange(25, 160, 10),
-            "bbands_stddev": np.arange(2.0, 6.0, 0.5),
-            "cvd_length": [40],  # np.arange(35, 60, 5),
-            "atr_length": [10],  # np.arange(5, 25, 5),
-            "sl_coef": [2.0],  # np.arange(2.0, 3.5, 0.5),
-            "tpsl_ratio": [2.5],  # np.arange(3.0, 5.5, 0.5)
-        }
-        print("Running FULL OPTIMIZATION")
+    strategy = CVDBBPullbackStrategy()
+    # param_ranges = strategy.param_ranges
+    param_ranges_small = {
+        "bbands_length": np.arange(25, 160, 10),
+        "bbands_stddev": np.arange(2.0, 6.0, 0.5),
+        "cvd_length": [40],  # np.arange(35, 60, 5),
+        "atr_length": [10],  # np.arange(5, 25, 5),
+        "sl_coef": [2.0],  # np.arange(2.0, 3.5, 0.5),
+        "tpsl_ratio": [2.5],  # np.arange(3.0, 5.5, 0.5)
+    }
+    print("Running FULL OPTIMIZATION")
 
-        total_combinations = np.prod(
-            [len(v) for v in param_ranges_small.values()])
-        print(f"Total parameter combinations: {total_combinations:,}")
+    total_combinations = np.prod(
+        [len(v) for v in param_ranges_small.values()])
+    print(f"Total parameter combinations: {total_combinations:,}")
 
-        results = run_backtest(
-            data=data,
-            param_ranges=param_ranges_small,
-            initial_cash=1000,
-            fee_pct=0.05,
-            risk_pct=1.0
-        )
+    results = run_backtest(
+        data=data,
+        param_ranges=param_ranges_small,
+        initial_cash=1000,
+        fee_pct=0.05,
+        risk_pct=1.0
+    )
 
-        analyze_results(results)
+    analyze_results(results)
 
-        print(f"\nBacktest completed successfully!")
-        print(f"Results saved to: results/backtests/")
-
-    except Exception as e:
-        print(f"Error: {e}")
-        sys.exit(1)
+    print(f"\nBacktest completed successfully!")
+    print(f"Results saved to: results/backtests/")
 
     end_time = time.time()
     duration = end_time - start_time

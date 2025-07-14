@@ -10,7 +10,7 @@ __author__ = "ActiveQuants"
 
 # Core imports for easy access
 from .strategies.base.strategy_base import StrategyBase
-from .backtesting.vectorbt_engine import VectorBTEngine
+from .bt_engine.vectorbt_engine import VectorBTEngine
 from .analysis.portfolio_analyzer import PortfolioAnalyzer
 
 __all__ = [
