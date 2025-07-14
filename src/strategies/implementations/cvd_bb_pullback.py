@@ -7,7 +7,7 @@ from vectorbt.portfolio.enums import SizeType, Direction
 
 from ..base.strategy_base import StrategyBase
 from ..base.risk_manager import _calculate_position_size
-from ..base.signal_generator import TechnicalSignalUtils
+from ...utils.technical import crossover, crossunder
 
 
 class CVDBBPullbackStrategy(StrategyBase):
@@ -157,10 +157,8 @@ class CVDBBPullbackStrategy(StrategyBase):
         Returns:
             Tuple of (long_entries, short_entries) boolean arrays
         """
-        long_entries = TechnicalSignalUtils.crossover(
-            cumulative_volume_delta, lower_bband)
-        short_entries = TechnicalSignalUtils.crossunder(
-            cumulative_volume_delta, upper_bband)
+        long_entries = crossover(cumulative_volume_delta, lower_bband)
+        short_entries = crossunder(cumulative_volume_delta, upper_bband)
 
         long_entries[0] = False
         short_entries[0] = False
