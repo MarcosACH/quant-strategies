@@ -7,6 +7,7 @@ from vectorbt.portfolio.enums import SizeType, Direction
 
 from ..base.strategy_base import StrategyBase
 from ..base.risk_manager import _calculate_position_size
+from ..base.signal_generator import TechnicalSignalUtils
 
 
 class CVDBBPullbackStrategy(StrategyBase):
@@ -100,14 +101,11 @@ class CVDBBPullbackStrategy(StrategyBase):
         Returns:
             Tuple of indicator outputs
         """
-        # Initialize vectorbt indicators
         BBANDS = vbt.IndicatorFactory.from_talib("BBANDS")
         ATR = vbt.IndicatorFactory.from_talib("ATR")
 
-        # Calculate volume delta
         volume_delta = np.where(close_prices >= open_prices, volume, -volume)
 
-        # Calculate cumulative volume delta using rolling sum
         volume_delta_flat = np.asarray(volume_delta).flatten()
         rolling_sum = np.convolve(
             volume_delta_flat, np.ones(cvd_length), mode="valid"
@@ -118,22 +116,18 @@ class CVDBBPullbackStrategy(StrategyBase):
         cumulative_volume_delta = cumulative_volume_delta.reshape(
             volume_delta.shape)
 
-        # Calculate Bollinger Bands on CVD
         bbands = BBANDS.run(cumulative_volume_delta,
                             bbands_length, bbands_stddev)
         upper_bband = bbands.upperband.values
         lower_bband = bbands.lowerband.values
 
-        # Calculate ATR
         atr = ATR.run(high_prices, low_prices,
                       close_prices, atr_length).real.values
 
-        # Generate signals
         long_entries, short_entries = CVDBBPullbackStrategy._get_signals(
             cumulative_volume_delta, upper_bband, lower_bband
         )
 
-        # Calculate exit prices
         long_tp_price = close_prices + (atr * sl_coef * tpsl_ratio)
         long_sl_price = close_prices - (atr * sl_coef)
         short_tp_price = close_prices - (atr * sl_coef * tpsl_ratio)
@@ -163,19 +157,11 @@ class CVDBBPullbackStrategy(StrategyBase):
         Returns:
             Tuple of (long_entries, short_entries) boolean arrays
         """
-        # Long: CVD crosses above lower BB after being below
-        long_entries = (
-            (cumulative_volume_delta > lower_bband) &
-            (np.roll(cumulative_volume_delta, 1) < np.roll(lower_bband, 1))
-        )
+        long_entries = TechnicalSignalUtils.crossover(
+            cumulative_volume_delta, lower_bband)
+        short_entries = TechnicalSignalUtils.crossunder(
+            cumulative_volume_delta, upper_bband)
 
-        # Short: CVD crosses below upper BB after being above
-        short_entries = (
-            (cumulative_volume_delta < upper_bband) &
-            (np.roll(cumulative_volume_delta, 1) > np.roll(upper_bband, 1))
-        )
-
-        # Prevent signals on first bar (no previous data)
         long_entries[0] = False
         short_entries[0] = False
 
@@ -185,7 +171,6 @@ class CVDBBPullbackStrategy(StrategyBase):
         """Validate strategy-specific parameters."""
         super()._validate_params()
 
-        # Validate parameter ranges
         if self.params['bbands_length'] < 5:
             raise ValueError("bbands_length must be >= 5")
 
@@ -237,21 +222,17 @@ def order_func_nb(
     exits_state = last_exits_state[col]
     high, low, close = high_prices[i], low_prices[i], close_prices[i]
 
-    # Calculate minimum and maximum position sizes in shares
     min_pos_size = min_size_value / close
     max_pos_size = max_size_value / close
 
-    # Entry logic - only when no position
     if pos == 0:
         long_signal = long_entries[i]
         short_signal = short_entries[i] if not long_signal else False
 
         if long_signal:
-            # Set exit prices for this position
             exits_state.active_tp_price = long_tp_price[i]
             exits_state.active_sl_price = long_sl_price[i]
 
-            # Calculate position size
             pos_size = _calculate_position_size(
                 sizing_method, risk_pct, risk_nominal, position_size_value,
                 c.cash_now, close, exits_state.active_sl_price, fee_decimal
@@ -264,11 +245,9 @@ def order_func_nb(
             )
 
         elif short_signal:
-            # Set exit prices for this position
             exits_state.active_tp_price = short_tp_price[i]
             exits_state.active_sl_price = short_sl_price[i]
 
-            # Calculate position size
             pos_size = _calculate_position_size(
                 sizing_method, risk_pct, risk_nominal, position_size_value,
                 c.cash_now, close, exits_state.active_sl_price, fee_decimal
@@ -282,28 +261,23 @@ def order_func_nb(
 
         return NoOrder
 
-    # Exit logic - when position exists
     sl_price, tp_price = exits_state.active_sl_price, exits_state.active_tp_price
 
-    if pos > 0:  # Long position
-        # Check stop loss
+    if pos > 0:
         if low <= sl_price:
             return order_nb(
                 -np.inf, sl_price, SizeType.Amount, Direction.LongOnly, fee_decimal
             )
-        # Check take profit
         elif high >= tp_price:
             return order_nb(
                 -np.inf, tp_price, SizeType.Amount, Direction.LongOnly, fee_decimal
             )
 
-    else:  # Short position (pos < 0)
-        # Check stop loss
+    else:
         if high >= sl_price:
             return order_nb(
                 -np.inf, sl_price, SizeType.Amount, Direction.ShortOnly, fee_decimal
             )
-        # Check take profit
         elif low <= tp_price:
             return order_nb(
                 -np.inf, tp_price, SizeType.Amount, Direction.ShortOnly, fee_decimal

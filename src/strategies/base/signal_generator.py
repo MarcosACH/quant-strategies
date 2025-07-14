@@ -1,45 +1,15 @@
-from abc import ABC, abstractmethod
-from typing import Tuple, Dict, Any
 import numpy as np
 from numba import njit
 
 
-class SignalGenerator(ABC):
+class TechnicalSignalUtils:
     """
-    Abstract base class for signal generation components.
+    Utility class containing common technical analysis signal detection functions.
 
-    This class defines the interface for generating trading signals
-    from market data and technical indicators.
+    This class provides reusable, high-performance functions for detecting
+    common trading signals like crossovers, threshold breaks, etc.
+    All methods are static and Numba-compiled for optimal performance.
     """
-
-    @abstractmethod
-    def generate_signals(self, *args, **kwargs) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate long and short entry signals.
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: (long_entries, short_entries) boolean arrays
-        """
-        pass
-
-    @abstractmethod
-    def calculate_exit_prices(self, *args, **kwargs) -> Tuple[np.ndarray, ...]:
-        """
-        Calculate take profit and stop loss prices.
-
-        Returns:
-            Tuple containing TP and SL prices for long and short positions
-        """
-        pass
-
-
-class TechnicalSignalGenerator(SignalGenerator):
-    """
-    Base class for technical indicator-based signal generation.
-    """
-
-    def __init__(self, params: Dict[str, Any]):
-        self.params = params
 
     @staticmethod
     @njit
