@@ -1,0 +1,118 @@
+graph LR
+    subgraph "Phase 1: Research & Data Foundation"
+        A[Strategy Hypothesis & Literature Review] --> B[Data Collection & Quality Assessment]
+        B --> C[Alternative Data Integration]
+        C --> D[Data Cleaning & Preprocessing]
+        D --> E[Exploratory Data Analysis]
+        E --> F[Feature Engineering Pipeline]
+        F --> G[Feature Selection & Dimensionality Reduction]
+        G --> H[Time Series Split Strategy]
+        H --> I[Training Set ~60%]
+        H --> J[Validation Set ~20%]
+        H --> K[Test Set ~20%]
+    end
+    
+    subgraph "Phase 2: Strategy Development & Optimization"
+        I --> L[Strategy Architecture Design]
+        L --> M[Signal Generation Logic]
+        M --> N[Portfolio Construction Rules]
+        N --> O[Parameter Space Definition]
+        O --> P[Multi-Objective Optimization<br/>Bayesian/Genetic Algorithms]
+        P --> Q[Time Series Cross-Validation]
+        Q --> R[Walk-Forward Analysis]
+        R --> S[Purged Cross-Validation]
+        S --> T{In-Sample Performance<br/>Meets Criteria?}
+        T -->|No| U[Strategy Architecture Review]
+        U --> L
+        T -->|Yes| V[Out-of-Sample Validation]
+    end
+    
+    subgraph "Phase 3: Advanced Validation & Risk Assessment"
+        V --> W[Monte Carlo Simulation]
+        W --> X[Bootstrap Confidence Intervals]
+        X --> Y[Regime Change Analysis]
+        Y --> Z[Parameter Sensitivity Testing]
+        Z --> AA[Model Explainability Analysis]
+        AA --> BB[Factor Exposure Assessment]
+        BB --> CC[Correlation Analysis with Benchmarks]
+        CC --> DD[Tail Risk Analysis]
+        DD --> EE[Stress Testing Scenarios]
+        EE --> FF[Statistical Significance Testing]
+        FF --> GG{Validation Results<br/>Satisfactory?}
+        GG -->|No| HH[Parameter Recalibration]
+        HH --> V
+        GG -->|Yes| II[Final Testing Phase]
+    end
+    
+    subgraph "Phase 4: Production Readiness Testing"
+        II --> JJ[Transaction Cost Analysis]
+        JJ --> KK[Market Impact Modeling]
+        KK --> LL[Slippage & Latency Analysis]
+        LL --> MM[Capacity Analysis]
+        MM --> NN[Performance Attribution]
+        NN --> OO[Risk-Adjusted Metrics]
+        OO --> PP[Benchmark Comparison]
+        PP --> QQ[Economic Significance Testing]
+        QQ --> RR{Final Performance<br/>Acceptable?}
+        RR -->|No| SS[Strategy Refinement]
+        SS --> L
+        RR -->|Yes| TT[Documentation & Governance]
+        TT --> UU[Risk Management Framework]
+        UU --> VV[Position Sizing Algorithm]
+    end
+    
+    subgraph "Phase 5: Deployment & Monitoring Infrastructure"
+        VV --> WW[Containerized Deployment]
+        WW --> XX[A/B Testing Framework]
+        XX --> YY[Paper Trading Environment]
+        YY --> ZZ[Shadow Trading Phase]
+        ZZ --> AAA[Real-time Monitoring Dashboard]
+        AAA --> BBB[Performance Tracking]
+        BBB --> CCC{Paper Trading<br/>Performance Aligned?}
+        CCC -->|No| DDD[Debug & Calibration]
+        DDD --> YY
+        CCC -->|Yes| EEE[Live Trading Infrastructure]
+        EEE --> FFF[Automated Rebalancing]
+        FFF --> GGG[Model Drift Detection]
+        GGG --> HHH[Performance Degradation Alerts]
+        HHH --> III[Strategy Health Monitoring]
+    end
+    
+    subgraph "Phase 6: Continuous Improvement & Lifecycle Management"
+        III --> JJJ[Model Performance Tracking]
+        JJJ --> KKK[Feature Importance Monitoring]
+        KKK --> LLL[Data Quality Monitoring]
+        LLL --> MMM[Market Regime Detection]
+        MMM --> NNN{Strategy Performance<br/>Degrading?}
+        NNN -->|No| OOO[Continue Monitoring]
+        OOO --> JJJ
+        NNN -->|Yes| PPP[Root Cause Analysis]
+        PPP --> QQQ[Strategy Retirement Decision]
+        QQQ --> RRR{Retire or<br/>Retrain?}
+        RRR -->|Retire| SSS[Strategy Sunset Process]
+        SSS --> TTT[Portfolio Rebalancing]
+        RRR -->|Retrain| UUU[Incremental Learning]
+        UUU --> VVV[Online Model Updates]
+        VVV --> WWW[Validation on Recent Data]
+        WWW --> XXX[Gradual Rollout]
+        XXX --> JJJ
+        TTT --> YYY[Post-Mortem Analysis]
+        YYY --> ZZZ[Lessons Learned Documentation]
+        ZZZ --> A
+    end
+    
+    classDef dataPhase fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000000
+    classDef developmentPhase fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000000
+    classDef validationPhase fill:#e8f5e8,stroke:#388e3c,stroke-width:2px,color:#000000
+    classDef testingPhase fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000000
+    classDef productionPhase fill:#ffebee,stroke:#d32f2f,stroke-width:2px,color:#000000
+    classDef lifecyclePhase fill:#f0f4c3,stroke:#827717,stroke-width:2px,color:#000000
+    classDef decisionPoint fill:#fff9c4,stroke:#f9a825,stroke-width:3px,color:#000000
+    
+    class A,B,C,D,E,F,G,H,I,J,K dataPhase
+    class L,M,N,O,P,Q,R,S,U developmentPhase
+    class V,W,X,Y,Z,AA,BB,CC,DD,EE,FF,HH validationPhase
+    class II,JJ,KK,LL,MM,NN,OO,PP,QQ,SS,TT,UU,VV testingPhase
+    class WW,XX,YY,ZZ,AAA,BBB,DDD,EEE,FFF,GGG,HHH,III productionPhase
+    class JJJ,KKK,LLL,MMM,OOO,PPP,QQQ,SSS,TTT,UUU,VVV,WWW,XXX,YYY,ZZZ lifecyclePhase
+    class T,GG,RR,CCC,NNN,RRR decisionPoint
