@@ -1,5 +1,6 @@
 # Core Data & Analysis
 pandas>=1.5.0
+polars>=0.20.0
 numpy>=1.21.0
 vectorbt>=0.25.0
 scipy>=1.9.0
@@ -8,6 +9,10 @@ scipy>=1.9.0
 yfinance>=0.2.0
 ccxt>=4.0.0
 alpha-vantage>=2.3.0
+httpx>=0.25.0
+
+# QuestDB
+questdb>=1.0.0
 
 # Machine Learning & Optimization
 scikit-learn>=1.1.0
@@ -16,6 +21,7 @@ optuna>=3.0.0
 # Database & Storage
 sqlalchemy>=1.4.0
 h5py>=3.7.0
+connectorx>=0.3.0
 
 # Visualization & Reporting
 matplotlib>=3.5.0
