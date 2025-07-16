@@ -43,17 +43,14 @@ class BaseStrategyConfig(ABC):
             if param_name in constraints:
                 constraint = constraints[param_name]
 
-                # Check minimum value
                 if 'min' in constraint and value < constraint['min']:
                     raise ValueError(
                         f"{param_name} must be >= {constraint['min']}, got {value}")
 
-                # Check maximum value
                 if 'max' in constraint and value > constraint['max']:
                     raise ValueError(
                         f"{param_name} must be <= {constraint['max']}, got {value}")
 
-                # Check data type
                 if 'type' in constraint and not isinstance(value, constraint['type']):
                     raise TypeError(
                         f"{param_name} must be of type {constraint['type']}, got {type(value)}")

@@ -1,3 +1,4 @@
+import numpy as np
 from typing import Dict, Any, List
 from .base_config import BaseStrategyConfig
 
@@ -26,12 +27,12 @@ class CVDBBPullbackConfig(BaseStrategyConfig):
     def param_ranges(self) -> Dict[str, List]:
         """Parameter ranges for optimization."""
         return {
-            'bbands_length': [15, 20, 25, 30, 35, 40, 45, 50],
-            'bbands_stddev': [1.0, 1.5, 2.0, 2.5, 3.0, 3.5],
-            'cvd_length': [20, 30, 40, 50, 60, 70, 80, 100],
-            'atr_length': [7, 10, 14, 20, 28, 35],
-            'sl_coef': [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0],
-            'tpsl_ratio': [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
+            "bbands_length": np.arange(25, 160, 10),
+            "bbands_stddev": np.arange(2.0, 6.0, 0.5),
+            "cvd_length": np.arange(35, 60, 5),
+            "atr_length": np.arange(5, 25, 5),
+            "sl_coef": np.arange(2.0, 3.5, 0.5),
+            "tpsl_ratio": np.arange(3.0, 5.5, 0.5)
         }
 
     @property
@@ -45,7 +46,7 @@ class CVDBBPullbackConfig(BaseStrategyConfig):
             },
             'bbands_stddev': {
                 'min': 0.1,
-                'max': 5.0,
+                'max': 6.0,
                 'type': (int, float)
             },
             'cvd_length': {

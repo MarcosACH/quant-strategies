@@ -3,7 +3,6 @@
 from .base_config import BaseStrategyConfig
 from .cvd_bb_config import CVDBBPullbackConfig
 
-# Strategy configuration registry
 STRATEGY_CONFIGS = {
     'cvd_bb_pullback': CVDBBPullbackConfig,
 }
