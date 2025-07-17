@@ -21,22 +21,16 @@ class QuestDBMarketDataQuery:
 
     def __init__(self,
                  host: str = "ec2-184-72-69-46.compute-1.amazonaws.com",
-                 port: int = 8812,
-                 database: str = "qdb",
-                 username: str = "admin",
-                 password: str = "quest"):
+                 port: int = 8812
+                 ):
         """
         Initialize QuestDB query service.
 
         Args:
             host: QuestDB host address
             port: QuestDB PostgreSQL port (default: 8812)
-            database: Database name
-            username: Database username
-            password: Database password
         """
-        # self.connection_uri = f"postgresql://{username}:{password}@{host}:{port}/{database}"
-        self.connection_uri = f"http::addr={host}:{port};"
+        self.connection_uri = f"redshift://admin:quest@{host}:{port}/qdb"
 
     def get_market_data(
         self,
@@ -85,12 +79,12 @@ class QuestDBMarketDataQuery:
                 AND exchange = '{exchange}'
                 AND timestamp >= '{start_date.isoformat()}'
                 AND timestamp <= '{end_date.isoformat()}'
-                SAMPLE BY {timeframe} FILL(PREV)
+                SAMPLE BY {timeframe} 
                 ORDER BY timestamp ASC
             """
 
         try:
-            df = pl.read_database(query, self.connection_uri)
+            df = pl.read_database_uri(query, self.connection_uri)
 
             df = df.with_columns(
                 col("timestamp").cast(pl.Datetime(
@@ -130,13 +124,13 @@ class QuestDBMarketDataQuery:
             }
 
         timeframe_ms = {
-            "1m": 60_000,
-            "5m": 300_000,
-            "15m": 900_000,
-            "30m": 1_800_000,
-            "1h": 3_600_000,
-            "4h": 14_400_000,
-            "1d": 86_400_000
+            "1m": 60000,
+            "5m": 300000,
+            "15m": 900000,
+            "30m": 1800000,
+            "1h": 3600000,
+            "4h": 14400000,
+            "1d": 86400000
         }
 
         expected_interval_ms = timeframe_ms.get(expected_timeframe)
@@ -199,7 +193,7 @@ class QuestDBMarketDataQuery:
         """
 
         try:
-            df = pl.read_database(query, self.connection_uri)
+            df = pl.read_database_uri(query, self.connection_uri)
             symbols = df["symbol"].to_list()
 
             print(f"Found {len(symbols)} symbols for {exchange}")
@@ -230,7 +224,7 @@ class QuestDBMarketDataQuery:
         """
 
         try:
-            df = pl.read_database(query, self.connection_uri)
+            df = pl.read_database_uri(query, self.connection_uri)
 
             if len(df) > 0:
                 result = df.to_dicts()[0]
@@ -255,63 +249,6 @@ class QuestDBMarketDataQuery:
             raise
 
 
-def get_btc_data(
-    start_date: datetime,
-    end_date: datetime,
-    timeframe: Optional[str] = None
-) -> pl.DataFrame:
-    """
-    Quick function to get BTC-USDT-SWAP data.
-
-    Args:
-        start_date: Start datetime
-        end_date: End datetime
-        timeframe: Data timeframe (None for raw data)
-
-    Returns:
-        Polars DataFrame with BTC data
-    """
-    query_service = QuestDBMarketDataQuery()
-    return query_service.get_market_data(
-        symbol="BTC-USDT-SWAP",
-        start_date=start_date,
-        end_date=end_date,
-        timeframe=timeframe
-    )
-
-
-def verify_data_quality(
-    symbol: str,
-    start_date: datetime,
-    end_date: datetime,
-    timeframe: str
-) -> dict:
-    """
-    Verify data quality for a specific symbol and timeframe.
-
-    Args:
-        symbol: Trading pair symbol
-        start_date: Start datetime
-        end_date: End datetime
-        timeframe: Expected timeframe
-
-    Returns:
-        Dictionary with verification results
-    """
-    query_service = QuestDBMarketDataQuery()
-
-    df = query_service.get_market_data(
-        symbol=symbol,
-        start_date=start_date,
-        end_date=end_date,
-        timeframe=timeframe
-    )
-
-    verification = query_service.verify_data_continuity(df, timeframe)
-
-    return verification
-
-
 if __name__ == "__main__":
     query_service = QuestDBMarketDataQuery()
 
@@ -323,7 +260,7 @@ if __name__ == "__main__":
         print(f"Data range for {symbols[0]}: {data_range}")
 
         end_date = datetime.now(timezone.utc)
-        start_date = end_date - timedelta(days=1)
+        start_date = datetime(2020, 1, 1, tzinfo=timezone.utc)
 
         df = query_service.get_market_data(
             symbol=symbols[0],

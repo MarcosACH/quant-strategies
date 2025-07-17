@@ -111,4 +111,5 @@ async def main(
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main(from_date="2022-07-25",
+                to_date="2023-01-01", batch_size=10))
