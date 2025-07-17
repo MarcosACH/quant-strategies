@@ -15,7 +15,8 @@ class OKX(Exchange):
     API_VERSION = "v5"
 
     def __init__(self):
-        super().__init__("OKX", "8/1s", f"{self.BASE_URL}/api/{self.API_VERSION}")
+        super().__init__("OKX", "20/2s",
+                         f"{self.BASE_URL}/api/{self.API_VERSION}")
 
     def _parse_candlesticks(self, responses: List[dict]) -> List[Candle]:
         if not responses:
@@ -66,7 +67,8 @@ class OKX(Exchange):
         step_ms = limit * 60_000  # 60 000 ms = 1 minute
 
         # Vectorized generation of the `[before, after]` windows.
-        befores = np.arange(from_timestamp, to_timestamp, step_ms, dtype=np.int64)
+        befores = np.arange(from_timestamp, to_timestamp,
+                            step_ms, dtype=np.int64)
         afters = np.minimum(
             befores + step_ms + 1, to_timestamp
         )  # +1 ms to make it inclusive

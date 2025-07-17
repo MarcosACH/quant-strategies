@@ -21,8 +21,8 @@ except ImportError as e:
 async def ingest_market_data(
     symbol: str = "BTC-USDT-SWAP",
     from_datetime: datetime = datetime(2020, 1, 1, tzinfo=timezone.utc),
-    to_datetime: datetime = datetime(2022, 1, 1, tzinfo=timezone.utc),
-    batch_size: int = 20,
+    to_datetime: datetime = datetime(2025, 1, 1, tzinfo=timezone.utc),
+    batch_size: int = 10,
     questdb_host: str = "ec2-184-72-69-46.compute-1.amazonaws.com",
     questdb_port: int = 9000,
     show_progress: bool = True
@@ -70,7 +70,7 @@ async def ingest_market_data(
 
         with Sender.from_conf(conf) as sender:
             sender.dataframe(
-                df.to_pandas(), table_name="ohlcv", at=TimestampNanos.now()
+                df.to_pandas(), table_name="ohlcv", at="timestamp"
             )
 
         total_records += len(df)
