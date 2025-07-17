@@ -1,11 +1,21 @@
 """QuestDB Market Data Ingestion Script using Candlestream."""
 
 import asyncio
-import argparse
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 import polars as pl
 from questdb.ingress import Sender, TimestampNanos
-from src.data.candlestream.exchanges.okx import OKX
+
+project_root = Path(__file__).parent.parent.parent
+sys.path.append(str(project_root))
+
+try:
+    from src.data.candlestream.exchanges.okx import OKX
+except ImportError as e:
+    print(f"Error importing modules: {e}")
+    print(f"Make sure you're running from the project root or the modules exist.")
+    sys.exit(1)
 
 
 async def ingest_market_data(
@@ -64,9 +74,6 @@ async def ingest_market_data(
             )
 
         total_records += len(df)
-        if show_progress:
-            print(
-                f"Ingested batch of {len(df)} records (Total: {total_records})")
 
     print(f"Data ingestion completed! Total records: {total_records}")
 
@@ -74,8 +81,8 @@ async def ingest_market_data(
 async def main(
     symbol: str = "BTC-USDT-SWAP",
     from_date: str = "2020-01-01",
-    to_date: str = "2022-01-01",
-    batch_size: int = 20,
+    to_date: str = None,
+    batch_size: int = 15,
     questdb_host: str = "ec2-184-72-69-46.compute-1.amazonaws.com",
     questdb_port: int = 9000,
     show_progress: bool = True
@@ -84,7 +91,7 @@ async def main(
     from_datetime = datetime.strptime(
         from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     to_datetime = datetime.strptime(
-        to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc) if to_date else to_date
 
     try:
         await ingest_market_data(
@@ -94,7 +101,7 @@ async def main(
             batch_size=batch_size,
             questdb_host=questdb_host,
             questdb_port=questdb_port,
-            show_progress=not show_progress
+            show_progress=show_progress
         )
     except KeyboardInterrupt:
         print("\nIngestion interrupted by user")
