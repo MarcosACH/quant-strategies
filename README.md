@@ -67,7 +67,27 @@ cp .env.example .env
 # Edit .env with your API keys and settings
 ```
 
-### 3. Run Your First Backtest
+### 3. Data Preparation
+
+**New**: Use the integrated data configuration system to prepare your datasets:
+
+```bash
+# Interactive notebook (recommended)
+jupyter notebook notebooks/01_data_exploration/data_configuration_interface.ipynb
+
+# Command line interface
+python scripts/prepare_data.py --symbol BTC-USDT-SWAP --start 2023-01-01 --end 2024-06-30
+```
+
+The data configuration system provides:
+
+- **Automated data quality validation**
+- **Proper time-based data splitting** (train/validation/test)
+- **Purging between splits** to prevent look-ahead bias
+- **Configurable parameters** for different strategy types
+- **Reproducible workflows** with saved configurations
+
+### 4. Run Your First Backtest
 
 ```python
 from src.strategies.implementations import CVDBBPullbackStrategy
