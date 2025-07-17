@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Union
-import h5py
+# import h5py
 import pickle
 import json
 from datetime import datetime
@@ -45,147 +45,147 @@ class FileManager:
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
 
-    def save_market_data(
-        self,
-        data: pd.DataFrame,
-        symbol: str,
-        timeframe: str,
-        source: str = "unknown",
-        format: str = "parquet",
-        compress: bool = True
-    ) -> Path:
-        """
-        Save market data to file.
+    # def save_market_data(
+    #     self,
+    #     data: pd.DataFrame,
+    #     symbol: str,
+    #     timeframe: str,
+    #     source: str = "unknown",
+    #     format: str = "parquet",
+    #     compress: bool = True
+    # ) -> Path:
+    #     """
+    #     Save market data to file.
 
-        Args:
-            data: OHLCV DataFrame
-            symbol: Asset symbol
-            timeframe: Data timeframe
-            source: Data source identifier
-            format: File format ('csv', 'parquet', 'hdf5')
-            compress: Whether to compress the file
+    #     Args:
+    #         data: OHLCV DataFrame
+    #         symbol: Asset symbol
+    #         timeframe: Data timeframe
+    #         source: Data source identifier
+    #         format: File format ('csv', 'parquet', 'hdf5')
+    #         compress: Whether to compress the file
 
-        Returns:
-            Path to saved file
-        """
-        # Create filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{symbol}_{timeframe}_{source}_{timestamp}"
+    #     Returns:
+    #         Path to saved file
+    #     """
+    #     # Create filename
+    #     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    #     filename = f"{symbol}_{timeframe}_{source}_{timestamp}"
 
-        if format == "parquet":
-            filepath = self.base_path / "raw" / f"{filename}.parquet"
-            if compress:
-                data.to_parquet(filepath, compression='gzip')
-            else:
-                data.to_parquet(filepath)
+    #     if format == "parquet":
+    #         filepath = self.base_path / "raw" / f"{filename}.parquet"
+    #         if compress:
+    #             data.to_parquet(filepath, compression='gzip')
+    #         else:
+    #             data.to_parquet(filepath)
 
-        elif format == "csv":
-            filepath = self.base_path / "raw" / f"{filename}.csv"
-            if compress:
-                data.to_csv(filepath, compression='gzip')
-            else:
-                data.to_csv(filepath)
+    #     elif format == "csv":
+    #         filepath = self.base_path / "raw" / f"{filename}.csv"
+    #         if compress:
+    #             data.to_csv(filepath, compression='gzip')
+    #         else:
+    #             data.to_csv(filepath)
 
-        elif format == "hdf5":
-            filepath = self.base_path / "raw" / f"{filename}.h5"
-            with h5py.File(filepath, 'w') as f:
-                # Store data arrays
-                for col in data.columns:
-                    f.create_dataset(
-                        col, data=data[col].values, compression='gzip' if compress else None)
+    #     elif format == "hdf5":
+    #         filepath = self.base_path / "raw" / f"{filename}.h5"
+    #         with h5py.File(filepath, 'w') as f:
+    #             # Store data arrays
+    #             for col in data.columns:
+    #                 f.create_dataset(
+    #                     col, data=data[col].values, compression='gzip' if compress else None)
 
-                # Store metadata
-                f.attrs['symbol'] = symbol
-                f.attrs['timeframe'] = timeframe
-                f.attrs['source'] = source
-                f.attrs['created_at'] = timestamp
+    #             # Store metadata
+    #             f.attrs['symbol'] = symbol
+    #             f.attrs['timeframe'] = timeframe
+    #             f.attrs['source'] = source
+    #             f.attrs['created_at'] = timestamp
 
-        else:
-            raise ValueError(f"Unsupported format: {format}")
+    #     else:
+    #         raise ValueError(f"Unsupported format: {format}")
 
-        return filepath
+    #     return filepath
 
-    def load_market_data(
-        self,
-        filepath: Union[str, Path],
-        format: str = None
-    ) -> pd.DataFrame:
-        """
-        Load market data from file.
+    # def load_market_data(
+    #     self,
+    #     filepath: Union[str, Path],
+    #     format: str = None
+    # ) -> pd.DataFrame:
+    #     """
+    #     Load market data from file.
 
-        Args:
-            filepath: Path to data file
-            format: File format (auto-detected if None)
+    #     Args:
+    #         filepath: Path to data file
+    #         format: File format (auto-detected if None)
 
-        Returns:
-            OHLCV DataFrame
-        """
-        filepath = Path(filepath)
+    #     Returns:
+    #         OHLCV DataFrame
+    #     """
+    #     filepath = Path(filepath)
 
-        if format is None:
-            format = filepath.suffix.lower().lstrip('.')
+    #     if format is None:
+    #         format = filepath.suffix.lower().lstrip('.')
 
-        if format == "parquet":
-            return pd.read_parquet(filepath)
+    #     if format == "parquet":
+    #         return pd.read_parquet(filepath)
 
-        elif format == "csv":
-            return pd.read_csv(filepath, index_col=0, parse_dates=True)
+    #     elif format == "csv":
+    #         return pd.read_csv(filepath, index_col=0, parse_dates=True)
 
-        elif format in ["hdf5", "h5"]:
-            data_dict = {}
-            with h5py.File(filepath, 'r') as f:
-                for key in f.keys():
-                    data_dict[key] = f[key][:]
+    #     elif format in ["hdf5", "h5"]:
+    #         data_dict = {}
+    #         with h5py.File(filepath, 'r') as f:
+    #             for key in f.keys():
+    #                 data_dict[key] = f[key][:]
 
-            return pd.DataFrame(data_dict)
+    #         return pd.DataFrame(data_dict)
 
-        else:
-            raise ValueError(f"Unsupported format: {format}")
+    #     else:
+    #         raise ValueError(f"Unsupported format: {format}")
 
-    def save_backtest_results(
-        self,
-        results: pd.DataFrame,
-        strategy_name: str,
-        symbol: str,
-        timeframe: str,
-        date_range: str,
-        compress: bool = True
-    ) -> Path:
-        """
-        Save backtest results to file.
+    # def save_backtest_results(
+    #     self,
+    #     results: pd.DataFrame,
+    #     strategy_name: str,
+    #     symbol: str,
+    #     timeframe: str,
+    #     date_range: str,
+    #     compress: bool = True
+    # ) -> Path:
+    #     """
+    #     Save backtest results to file.
 
-        Args:
-            results: Backtest results DataFrame
-            strategy_name: Strategy name
-            symbol: Asset symbol
-            timeframe: Data timeframe
-            date_range: Date range identifier
-            compress: Whether to compress the file
+    #     Args:
+    #         results: Backtest results DataFrame
+    #         strategy_name: Strategy name
+    #         symbol: Asset symbol
+    #         timeframe: Data timeframe
+    #         date_range: Date range identifier
+    #         compress: Whether to compress the file
 
-        Returns:
-            Path to saved file
-        """
-        filename = f"{strategy_name}_{symbol}_{timeframe}_{date_range}_results.parquet"
-        filepath = self.base_path / "backtest_results" / filename
+    #     Returns:
+    #         Path to saved file
+    #     """
+    #     filename = f"{strategy_name}_{symbol}_{timeframe}_{date_range}_results.parquet"
+    #     filepath = self.base_path / "backtest_results" / filename
 
-        if compress:
-            results.to_parquet(filepath, compression='gzip')
-        else:
-            results.to_parquet(filepath)
+    #     if compress:
+    #         results.to_parquet(filepath, compression='gzip')
+    #     else:
+    #         results.to_parquet(filepath)
 
-        return filepath
+    #     return filepath
 
-    def load_backtest_results(self, filepath: Union[str, Path]) -> pd.DataFrame:
-        """
-        Load backtest results from file.
+    # def load_backtest_results(self, filepath: Union[str, Path]) -> pd.DataFrame:
+    #     """
+    #     Load backtest results from file.
 
-        Args:
-            filepath: Path to results file
+    #     Args:
+    #         filepath: Path to results file
 
-        Returns:
-            Backtest results DataFrame
-        """
-        return pd.read_parquet(filepath)
+    #     Returns:
+    #         Backtest results DataFrame
+    #     """
+    #     return pd.read_parquet(filepath)
 
     def save_features(
         self,

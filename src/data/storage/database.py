@@ -31,27 +31,7 @@ class MarketData(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
-class BacktestResults(Base):
-    """Backtest results table schema."""
-    __tablename__ = 'backtest_results'
-
-    id = Column(Integer, primary_key=True)
-    strategy_name = Column(String(50), nullable=False)
-    symbol = Column(String(20), nullable=False)
-    timeframe = Column(String(10), nullable=False)
-    start_date = Column(DateTime, nullable=False)
-    end_date = Column(DateTime, nullable=False)
-    parameters = Column(String(1000), nullable=False)  # JSON string
-    total_return = Column(Float)
-    sharpe_ratio = Column(Float)
-    max_drawdown = Column(Float)
-    total_trades = Column(Integer)
-    win_rate = Column(Float)
-    profit_factor = Column(Float)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-
-class DatabaseManager:
+class QuestDBManager:
     """
     Database abstraction layer for market data and backtesting results.
 
