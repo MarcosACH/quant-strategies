@@ -23,7 +23,7 @@ async def ingest_market_data(
     from_datetime: datetime = datetime(2020, 1, 1, tzinfo=timezone.utc),
     to_datetime: datetime = datetime(2025, 1, 1, tzinfo=timezone.utc),
     batch_size: int = 10,
-    questdb_host: str = "ec2-184-72-69-46.compute-1.amazonaws.com",
+    questdb_host: str = "ec2-44-202-48-168.compute-1.amazonaws.com",
     questdb_port: int = 9000,
     show_progress: bool = True
 ):
@@ -83,7 +83,7 @@ async def main(
     from_date: str = "2020-01-01",
     to_date: str = None,
     batch_size: int = 15,
-    questdb_host: str = "ec2-184-72-69-46.compute-1.amazonaws.com",
+    questdb_host: str = "ec2-44-202-48-168.compute-1.amazonaws.com",
     questdb_port: int = 9000,
     show_progress: bool = True
 ):
@@ -111,5 +111,5 @@ async def main(
 
 
 if __name__ == "__main__":
-    asyncio.run(main(from_date="2022-07-25",
-                to_date="2023-01-01", batch_size=10))
+    asyncio.run(main(from_date="2020-01-01",
+                to_date="2022-01-01", batch_size=8))

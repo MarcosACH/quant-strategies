@@ -131,7 +131,7 @@ The system connects to QuestDB using:
 
 **Default Connection:**
 
-- Host: `ec2-184-72-69-46.compute-1.amazonaws.com`
+- Host: `ec2-44-202-48-168.compute-1.amazonaws.com`
 - Ingestion Port: 9000
 - Query Port: 8812
 - Database: `qdb`

@@ -20,7 +20,7 @@ class QuestDBMarketDataQuery:
     """
 
     def __init__(self,
-                 host: str = "ec2-184-72-69-46.compute-1.amazonaws.com",
+                 host: str = "ec2-44-202-48-168.compute-1.amazonaws.com",
                  port: int = 8812
                  ):
         """
