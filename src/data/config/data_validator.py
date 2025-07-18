@@ -5,8 +5,7 @@ This module provides validation utilities for data quality assessment
 and continuity checking in the quantitative strategy development workflow.
 """
 
-from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
+from typing import Dict, Any
 import polars as pl
 from polars import col
 
@@ -118,7 +117,7 @@ class DataValidator:
         ])
 
         gaps = df_with_diff.filter(
-            (col("diff_ms") > expected_interval_ms * 1.1) &  # Allow 10% tolerance
+            (col("diff_ms") > expected_interval_ms) &
             (col("diff_ms").is_not_null())
         )
 
