@@ -5,7 +5,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 import polars as pl
-from questdb.ingress import Sender, TimestampNanos
+from questdb.ingress import Sender
 
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
