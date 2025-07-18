@@ -6,11 +6,9 @@ and preparation in the quantitative strategy development workflow.
 """
 
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Any
 from dataclasses import dataclass, field
-from pathlib import Path
 import yaml
-import polars as pl
 from config.settings import settings
 
 
