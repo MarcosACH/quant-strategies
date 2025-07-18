@@ -3,10 +3,20 @@ Example Data Configuration
 
 This file shows how to create data configurations programmatically.
 """
+import sys
+from pathlib import Path
+from datetime import datetime, timezone
 
-from datetime import datetime, timezone, timedelta
-from src.data.config.data_config import DataConfig, DataSplitConfig
-from src.data.pipeline.data_preparation import DataPreparationPipeline
+project_root = Path(__file__).parent.parent
+sys.path.append(str(project_root))
+
+try:
+    from src.data.config.data_config import DataConfig, DataSplitConfig
+    from src.data.pipeline.data_preparation import DataPreparationPipeline
+except ImportError as e:
+    print(f"Error importing modules: {e}")
+    print(f"Make sure you're running from the project root or the modules exist.")
+    sys.exit(1)
 
 
 def create_btc_config():
@@ -81,7 +91,7 @@ def prepare_all_configs():
     ]
 
     for config in configs:
-        print(f"\\nPreparing data for: {config.config_name}")
+        print(f"\nPreparing data for: {config.config_name}")
         print(f"   Symbol: {config.symbol}")
         print(
             f"   Period: {config.start_date.strftime('%Y-%m-%d')} to {config.end_date.strftime('%Y-%m-%d')}")
@@ -89,7 +99,7 @@ def prepare_all_configs():
 
         try:
             pipeline = DataPreparationPipeline(config)
-            prepared_datasets = pipeline.prepare_data(save_to_disk=True)
+            prepared_datasets = pipeline.prepare_data(save_to_disk=False)
 
             print(f"Successfully prepared {config.config_name}")
 
@@ -105,17 +115,16 @@ if __name__ == "__main__":
     eth_config = create_eth_config()
     short_config = create_short_term_config()
 
-    print("\\n1. BTC Configuration:")
+    print("\n1. BTC Configuration:")
     print(str(btc_config))
 
-    print("\\n2. ETH Configuration:")
+    print("\n2. ETH Configuration:")
     print(str(eth_config))
 
-    print("\\n3. Short-term Configuration:")
+    print("\n3. Short-term Configuration:")
     print(str(short_config))
 
-    print("\\nTo prepare data for these configurations, uncomment the line below:")
+    print("\nTo prepare data for these configurations, uncomment the line below:")
     print("# prepare_all_configs()")
 
-    # Uncomment to actually prepare the data
-    # prepare_all_configs()
+    prepare_all_configs()
