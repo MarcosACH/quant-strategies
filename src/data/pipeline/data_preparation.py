@@ -5,10 +5,9 @@ This module provides a complete pipeline for data preparation in the
 quantitative strategy development workflow.
 """
 
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
+from typing import Dict, List
+from datetime import datetime
 import polars as pl
-from pathlib import Path
 import json
 
 from src.data.query.questdb_market_data_query import QuestDBMarketDataQuery
