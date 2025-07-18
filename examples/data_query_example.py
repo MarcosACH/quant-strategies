@@ -63,24 +63,10 @@ def main():
         print(df.head())
         print()
 
-        print("4. Verifying data continuity...")
-        verification = query_service.verify_data_continuity(df, "5m")
-
-        print(f"   Continuous data: {verification['is_continuous']}")
-        print(f"   Total records: {verification['total_records']}")
-        print(f"   Gaps found: {verification['gaps_found']}")
-
-        if verification['gaps_found'] > 0:
-            print("   Gap details:")
-            for gap in verification['gap_details'][:5]:  # Show first 5 gaps
-                print(f"     - {gap['timestamp']}: Expected {gap['expected_interval_ms']}ms, "
-                      f"got {gap['actual_interval_ms']}ms (x{gap['gap_multiple']:.1f})")
-        print()
-
     except Exception as e:
         print(f"   Error: {e}\n")
 
-    print("5. Getting raw data (no sampling)...")
+    print("4. Getting raw data (no sampling)...")
     try:
         raw_df = query_service.get_market_data(
             symbol="BTC-USDT-SWAP",

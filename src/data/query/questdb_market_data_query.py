@@ -99,82 +99,6 @@ class QuestDBMarketDataQuery:
             print(f"Error querying market data: {e}")
             raise
 
-    def verify_data_continuity(
-        self,
-        df: pl.DataFrame,
-        expected_timeframe: str
-    ) -> dict:
-        """
-        Verify data continuity by checking timestamp gaps.
-
-        Args:
-            df: DataFrame with timestamp column
-            expected_timeframe: Expected timeframe (1m, 5m, 15m, 30m, 1h, 4h, 1d)
-
-        Returns:
-            Dictionary with verification results
-        """
-        if len(df) < 2:
-            return {
-                "is_continuous": True,
-                "total_records": len(df),
-                "expected_interval": expected_timeframe,
-                "gaps_found": 0,
-                "gap_details": []
-            }
-
-        timeframe_ms = {
-            "1m": 60000,
-            "5m": 300000,
-            "15m": 900000,
-            "30m": 1800000,
-            "1h": 3600000,
-            "4h": 14400000,
-            "1d": 86400000
-        }
-
-        expected_interval_ms = timeframe_ms.get(expected_timeframe)
-        if expected_interval_ms is None:
-            raise ValueError(f"Unsupported timeframe: {expected_timeframe}")
-
-        df_with_diff = df.with_columns([
-            col("timestamp").diff().alias("time_diff")
-        ])
-
-        df_with_diff = df_with_diff.with_columns([
-            col("time_diff").dt.total_milliseconds().alias("diff_ms")
-        ])
-
-        gaps = df_with_diff.filter(
-            (col("diff_ms") != expected_interval_ms) &
-            (col("diff_ms").is_not_null())
-        )
-
-        gap_details = []
-        if len(gaps) > 0:
-            gap_details = [
-                {
-                    "timestamp": row["timestamp"],
-                    "expected_interval_ms": expected_interval_ms,
-                    "actual_interval_ms": row["diff_ms"],
-                    "gap_multiple": row["diff_ms"] / expected_interval_ms if expected_interval_ms > 0 else 0
-                }
-                for row in gaps.to_dicts()
-            ]
-
-        return {
-            "is_continuous": len(gaps) == 0,
-            "total_records": len(df),
-            "expected_interval": expected_timeframe,
-            "expected_interval_ms": expected_interval_ms,
-            "gaps_found": len(gaps),
-            "gap_details": gap_details,
-            "data_range": {
-                "start": df["timestamp"].min(),
-                "end": df["timestamp"].max()
-            }
-        }
-
     def get_available_symbols(self, exchange: str = "OKX") -> List[str]:
         """
         Get list of available symbols in the database.
@@ -271,6 +195,3 @@ if __name__ == "__main__":
 
         print(f"Sample data:")
         print(df.head())
-
-        verification = query_service.verify_data_continuity(df, "5m")
-        print(f"Data continuity check: {verification}")

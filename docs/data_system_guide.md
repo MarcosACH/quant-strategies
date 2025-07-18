@@ -53,7 +53,6 @@ Provides a Polars-based interface to query market data from QuestDB.
 **Key Methods:**
 
 - `get_market_data()`: Fetch OHLCV data with optional sampling
-- `verify_data_continuity()`: Check for gaps in time series data
 - `get_available_symbols()`: List available trading pairs
 - `get_data_range()`: Get data availability information
 
@@ -81,11 +80,6 @@ df_5m = query_service.get_market_data(
     end_date=datetime(2023, 1, 2, tzinfo=timezone.utc),
     timeframe="5m"
 )
-
-# Verify data continuity
-verification = query_service.verify_data_continuity(df_5m, "5m")
-print(f"Data is continuous: {verification['is_continuous']}")
-print(f"Gaps found: {verification['gaps_found']}")
 ```
 
 ### 3. Example Usage (`examples/data_query_example.py`)
