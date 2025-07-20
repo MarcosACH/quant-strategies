@@ -24,25 +24,6 @@ except ImportError as e:
     sys.exit(1)
 
 
-def load_parquet_data(file_path: Path) -> pl.DataFrame:
-    """Load and validate parquet data file."""
-    if not file_path.exists():
-        raise FileNotFoundError(f"Data file not found: {file_path}")
-
-    data = pl.read_parquet(file_path)
-
-    required_columns = ['open', 'high', 'low', 'close', 'volume']
-    missing_columns = [
-        col for col in required_columns if col not in data.columns]
-    if missing_columns:
-        raise ValueError(f"Missing required columns: {missing_columns}")
-
-    print(f"Loaded data: {data.shape[0]:,} rows, {data.shape[1]} columns")
-    print(f"Date range: {data["datetime"].min()} to {data["datetime"].max()}")
-
-    return data
-
-
 def run_backtest(
     data: pl.DataFrame,
     param_ranges: dict,
@@ -116,10 +97,6 @@ def analyze_results(results: pl.DataFrame) -> None:
 def main():
     """Main function to run the backtest."""
     start_time = time.time()
-    data_path = settings.DATA_ROOT_PATH / "processed" / \
-        "features" / "okx_btc_usdt_perp_1m_2022_10_27-2022_12_27.parquet"
-
-    data = load_parquet_data(data_path)
 
     strategy = CVDBBPullbackStrategy()
     # param_ranges = strategy.param_ranges
