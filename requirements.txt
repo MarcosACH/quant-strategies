@@ -17,6 +17,7 @@ questdb>=1.0.0
 # Machine Learning & Optimization
 scikit-learn>=1.1.0
 optuna>=3.0.0
+scikit-optimize>=0.9.0  # For Bayesian optimization
 
 # Database & Storage
 sqlalchemy>=1.4.0
