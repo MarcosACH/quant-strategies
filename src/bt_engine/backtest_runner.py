@@ -43,9 +43,7 @@ sys.path.append(str(project_root))
 try:
     from src.data.pipeline.data_preparation import DataPreparationPipeline
     from src.optimization.parameters_selector import ParametersSelection
-    from src.strategies.implementations.cvd_bb_pullback import CVDBBPullbackStrategy
     from src.bt_engine.vectorbt_engine import VectorBTEngine
-    from src.data.query.questdb_market_data_query import QuestDBMarketDataQuery
     from src.data.config.data_config import DataConfig, DataSplitConfig
 except ImportError as e:
     print(f"Error importing modules: {e}")
@@ -59,6 +57,8 @@ class BacktestRunner:
     """
 
     def __init__(self,
+                 strategy,
+                 query_service,
                  symbol: str,
                  start_date: str,
                  end_date: str,
@@ -68,7 +68,10 @@ class BacktestRunner:
                  fee_pct: float = 0.05,
                  risk_pct: float = 1.0,
                  config_name: str = None,
-                 description: str = None
+                 description: str = None,
+                 train_pct: float = 0.6,
+                 validation_pct: float = 0.2,
+                 test_pct: float = 0.2
                  ):
         """
         Initialize the backtest runner.
@@ -102,10 +105,14 @@ class BacktestRunner:
         self.fee_pct = fee_pct
         self.risk_pct = risk_pct
 
-        self.strategy = CVDBBPullbackStrategy()
-        self.query_service = QuestDBMarketDataQuery()
-        self.results_dir = Path("data/backtest_results")
+        self.strategy = strategy
+        self.query_service = query_service
+        self.results_dir = Path("data/backtest_results/optimization")
         self.results_dir.mkdir(parents=True, exist_ok=True)
+
+        self.train_pct = train_pct
+        self.validation_pct = validation_pct
+        self.test_pct = test_pct
 
         self.config_name = config_name or f"{symbol.lower().replace('-', '_')}_{timeframe}_{start_date.replace('-', '')}_{end_date.replace('-', '')}"
         self.description = description or f"{symbol} {timeframe} data from {start_date} to {end_date}"
@@ -178,9 +185,7 @@ class BacktestRunner:
                     print(
                         f"   Period: {dataset['timestamp'].min()} to {dataset['timestamp'].max()}")
 
-            print(f"\nReady to proceed to Phase 2: Strategy Development!")
-            print(
-                f"\nUse this configuration name in your notebooks: '{self.config_name}'")
+            return prepared_datasets['Train']
 
         except Exception as e:
             print(f"\nError during preparation: {e}")
@@ -460,122 +465,3 @@ class BacktestRunner:
             json.dump(best_params, f, indent=2, default=str)
 
         print(f"Best parameters saved to: {params_file}")
-
-
-def example_grid_search():
-    """Example: Run grid search optimization."""
-    param_selector = ParametersSelection()
-
-    runner = BacktestRunner(
-        symbol="BTC-USDT-SWAP",
-        start_date="2022-01-01",
-        end_date="2022-12-31",
-        timeframe="1h",
-        initial_cash=1000,
-        fee_pct=0.05,
-        risk_pct=1.0
-    )
-
-    results = runner.run_backtest(
-        param_selector=param_selector,
-        method="grid",
-        optimization_metric="sharpe_ratio",
-        save_results=True
-    )
-
-    return results
-
-
-def example_random_search():
-    """Example: Run random search optimization."""
-    param_selector = ParametersSelection()
-
-    runner = BacktestRunner(
-        symbol="BTC-USDT-SWAP",
-        start_date="2022-01-01",
-        end_date="2022-12-31",
-        timeframe="1h"
-    )
-
-    results = runner.run_backtest(
-        param_selector=param_selector,
-        method="random",
-        optimization_metric="sharpe_ratio",
-        n_iter=100,
-        save_results=True
-    )
-
-    return results
-
-
-def example_bayesian_optimization():
-    """Example: Run Bayesian optimization."""
-    param_selector = ParametersSelection()
-
-    runner = BacktestRunner(
-        symbol="BTC-USDT-SWAP",
-        start_date="2022-01-01",
-        end_date="2022-12-31",
-        timeframe="1h"
-    )
-
-    results = runner.run_backtest(
-        param_selector=param_selector,
-        method="bayesian",
-        optimization_metric="sharpe_ratio",
-        n_iter=50,
-        save_results=True
-    )
-
-    return results
-
-
-def example_custom_optimization():
-    """Example: Run optimization with custom parameters and metric."""
-    param_selector = ParametersSelection()
-
-    runner = BacktestRunner(
-        symbol="ETH-USDT-SWAP",
-        start_date="2023-01-01",
-        end_date="2023-06-30",
-        timeframe="4h",
-        initial_cash=5000,
-        fee_pct=0.04,
-        risk_pct=2.0
-    )
-
-    results = runner.run_backtest(
-        param_selector=param_selector,
-        method="random",
-        optimization_metric="total_return_pct",
-        n_iter=150,
-        save_results=True
-    )
-
-    return results
-
-
-if __name__ == "__main__":
-    """
-    Direct execution examples. 
-    Uncomment the desired example to run.
-    """
-
-    print("Enhanced CVD BB Pullback Strategy Backtesting")
-    print("=" * 60)
-
-    # Example 1: Grid Search
-    print("Running Grid Search Example...")
-    results = example_grid_search()
-
-    # Example 2: Random Search (uncomment to run)
-    # print("Running Random Search Example...")
-    # results = example_random_search()
-
-    # Example 3: Bayesian Optimization (uncomment to run)
-    # print("Running Bayesian Optimization Example...")
-    # results = example_bayesian_optimization()
-
-    # Example 4: Custom optimization (uncomment to run)
-    # print("Running Custom Optimization Example...")
-    # results = example_custom_optimization()
