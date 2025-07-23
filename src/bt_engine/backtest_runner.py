@@ -185,7 +185,7 @@ class BacktestRunner:
                     print(
                         f"   Period: {dataset['timestamp'].min()} to {dataset['timestamp'].max()}")
 
-            return prepared_datasets['Train']
+            return prepared_datasets['train']
 
         except Exception as e:
             print(f"\nError during preparation: {e}")
