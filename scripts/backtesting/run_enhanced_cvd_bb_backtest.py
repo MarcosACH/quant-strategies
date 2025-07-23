@@ -31,27 +31,16 @@ import numpy as np
 from pathlib import Path
 import time
 import json
-from typing import Dict, List, Tuple, Any, Optional, Union
+from typing import Dict, List
 from datetime import datetime, timezone
+from skopt import gp_minimize
+from skopt.utils import use_named_args
 
-# Third-party optimization libraries
-try:
-    from sklearn.model_selection import ParameterSampler
-    from scipy.stats import uniform, randint
-    from skopt import gp_minimize
-    from skopt.space import Real, Integer
-    from skopt.utils import use_named_args
-except ImportError as e:
-    print(f"Missing optimization libraries. Install with: pip install scikit-learn scipy scikit-optimize")
-    print(f"Error: {e}")
-    sys.exit(1)
-
-# Project imports
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
 try:
-    from config.settings import settings
+    from src.optimization.parameters_selector import ParameterSelection
     from src.strategies.implementations.cvd_bb_pullback import CVDBBPullbackStrategy
     from src.bt_engine.vectorbt_engine import VectorBTEngine
     from src.data.query.questdb_market_data_query import QuestDBMarketDataQuery
@@ -61,142 +50,6 @@ except ImportError as e:
     print(f"Error importing modules: {e}")
     print(f"Make sure you're running from the project root or the modules exist.")
     sys.exit(1)
-
-
-class ParameterSelection:
-    """
-    Parameter selection engine for strategy optimization.
-
-    This class generates parameter ranges for different optimization methods
-    without performing the actual backtesting.
-    """
-
-    def __init__(self):
-        """Initialize the parameter selector."""
-        self.strategy = CVDBBPullbackStrategy()
-
-        # Define base parameter ranges
-        self.base_param_ranges = {
-            "bbands_length": list(range(25, 160, 5)),
-            "bbands_stddev": [round(x, 1) for x in np.arange(2.0, 6.0, 0.1)],
-            "cvd_length": list(range(35, 65, 5)),
-            "atr_length": list(range(5, 25, 2)),
-            "sl_coef": [round(x, 1) for x in np.arange(2.0, 3.5, 0.1)],
-            "tpsl_ratio": [round(x, 1) for x in np.arange(2.0, 5.0, 0.1)]
-        }
-
-        # Reduced ranges for grid search
-        self.grid_param_ranges = {
-            "bbands_length": [25, 50, 75, 100, 125, 150],
-            "bbands_stddev": [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5],
-            "cvd_length": [40, 50, 60],
-            "atr_length": [10, 14, 20],
-            "sl_coef": [2.0, 2.5, 3.0],
-            "tpsl_ratio": [2.0, 2.5, 3.0, 3.5]
-        }
-
-    def get_grid_search_params(self, reduced: bool = True) -> Dict[str, List]:
-        """
-        Get parameter ranges for grid search.
-
-        Args:
-            reduced: Whether to use reduced parameter ranges for faster computation
-
-        Returns:
-            Dictionary with parameter ranges for grid search
-        """
-        if reduced:
-            param_ranges = self.grid_param_ranges.copy()
-            total_combinations = np.prod(
-                [len(v) for v in param_ranges.values()])
-            print(
-                f"Grid search: {total_combinations:,} parameter combinations")
-        else:
-            param_ranges = self.base_param_ranges.copy()
-            total_combinations = np.prod(
-                [len(v) for v in param_ranges.values()])
-            print(
-                f"Grid search (full): {total_combinations:,} parameter combinations")
-            print("Warning: This will take a very long time!")
-
-        return param_ranges
-
-    def get_random_search_params(self, n_iter: int = 100, custom_ranges: Optional[Dict[str, List]] = None) -> Dict[str, List]:
-        """
-        Generate random parameter combinations for random search.
-
-        Args:
-            n_iter: Number of random combinations to generate
-            custom_ranges: Custom parameter ranges (uses base ranges if None)
-
-        Returns:
-            Dictionary with parameter ranges for random search
-        """
-        print(f"Generating {n_iter} random search parameters...")
-
-        param_ranges = custom_ranges or self.base_param_ranges
-
-        # Convert parameter ranges to distributions
-        param_distributions = {}
-        for param_name, param_values in param_ranges.items():
-            if isinstance(param_values[0], (int, np.integer)):
-                # Integer parameters
-                param_distributions[param_name] = randint(
-                    min(param_values), max(param_values) + 1)
-            else:
-                # Float parameters
-                param_distributions[param_name] = uniform(
-                    min(param_values), max(param_values) - min(param_values))
-
-        # Generate random samples
-        param_sampler = ParameterSampler(
-            param_distributions, n_iter=n_iter, random_state=42)
-        param_combinations = list(param_sampler)
-
-        # Convert to the format expected by the backtesting engine
-        param_dict = {}
-        for param_name in param_ranges.keys():
-            param_dict[param_name] = [combo[param_name]
-                                      for combo in param_combinations]
-
-        print(
-            f"Generated {len(param_combinations):,} random parameter combinations")
-        return param_dict
-
-    def get_bayesian_optimization_params(self,
-                                         n_iter: int = 50,
-                                         custom_ranges: Optional[Dict[str, List]] = None) -> Tuple[List, List[str]]:
-        """
-        Get parameter space definition for Bayesian optimization.
-
-        Args:
-            n_iter: Number of optimization iterations
-            custom_ranges: Custom parameter ranges (uses base ranges if None)
-
-        Returns:
-            Tuple of (search dimensions, parameter names)
-        """
-        print(
-            f"Setting up Bayesian optimization space for {n_iter} iterations...")
-
-        param_ranges = custom_ranges or self.base_param_ranges
-
-        # Define search space
-        dimensions = []
-        param_names = []
-
-        for param_name, param_values in param_ranges.items():
-            param_names.append(param_name)
-            if isinstance(param_values[0], (int, np.integer)):
-                dimensions.append(
-                    Integer(min(param_values), max(param_values), name=param_name))
-            else:
-                dimensions.append(
-                    Real(min(param_values), max(param_values), name=param_name))
-
-        print(
-            f"Bayesian optimization space configured with {len(dimensions)} parameters")
-        return dimensions, param_names
 
 
 class BacktestRunner:
@@ -237,13 +90,11 @@ class BacktestRunner:
         self.fee_pct = fee_pct
         self.risk_pct = risk_pct
 
-        # Initialize components
         self.strategy = CVDBBPullbackStrategy()
         self.query_service = QuestDBMarketDataQuery()
         self.results_dir = Path("data/backtest_results")
         self.results_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create configuration name
         self.config_name = f"{symbol.lower().replace('-', '_')}_{timeframe}_{start_date.replace('-', '')}_{end_date.replace('-', '')}"
 
     def load_training_data(self) -> pl.DataFrame:
@@ -260,7 +111,6 @@ class BacktestRunner:
         print(f"Timeframe: {self.timeframe}")
 
         try:
-            # Get data from QuestDB
             data = self.query_service.get_market_data(
                 symbol=self.symbol,
                 exchange=self.exchange,
@@ -272,7 +122,6 @@ class BacktestRunner:
             if len(data) == 0:
                 raise ValueError("No data retrieved from QuestDB")
 
-            # Create data configuration for validation
             split_config = DataSplitConfig(
                 train_pct=1.0, validation_pct=0.0, test_pct=0.0)
             config = DataConfig(
@@ -286,7 +135,6 @@ class BacktestRunner:
                 description=f"Training data for {self.symbol}"
             )
 
-            # Validate and clean data
             validator = DataValidator(config)
             validation_results = validator.validate_data_quality(data)
 
@@ -294,7 +142,6 @@ class BacktestRunner:
                 print("Data validation failed!")
                 for issue in validation_results['issues']:
                     print(f"   • {issue}")
-                # Continue with cleaning instead of failing
                 print("Attempting to clean data...")
 
             cleaned_data = validator.clean_data(data)
@@ -331,10 +178,8 @@ class BacktestRunner:
         """
         start_time = time.time()
 
-        # Load training data
         data = self.load_training_data()
 
-        # Initialize VectorBT engine
         engine = VectorBTEngine(
             initial_cash=self.initial_cash,
             fee_pct=self.fee_pct,
@@ -346,7 +191,6 @@ class BacktestRunner:
         print(f"Optimization metric: {optimization_metric}")
         print(f"{'='*60}")
 
-        # Get parameter ranges based on method
         if method == "grid":
             param_ranges = param_selector.get_grid_search_params(reduced=True)
             results = self._run_grid_search(engine, data, param_ranges)
@@ -364,7 +208,6 @@ class BacktestRunner:
         else:
             raise ValueError(f"Unknown optimization method: {method}")
 
-        # Analyze and save results
         if len(results) > 0:
             self.analyze_results(results, method, optimization_metric)
             if save_results:
@@ -421,7 +264,6 @@ class BacktestRunner:
                                    optimization_metric: str,
                                    n_iter: int) -> pl.DataFrame:
         """Run Bayesian optimization."""
-        # Store results for final DataFrame
         evaluated_params = []
         all_results = []
 
@@ -429,10 +271,8 @@ class BacktestRunner:
         def objective(**params):
             """Objective function to minimize."""
             try:
-                # Convert single parameter set to format expected by engine
                 param_dict = {name: [value] for name, value in params.items()}
 
-                # Run backtest
                 results = engine.simulate_portfolios(
                     strategy=self.strategy,
                     data=data,
@@ -450,7 +290,6 @@ class BacktestRunner:
                     result_dict = results.to_dicts()[0]
                     metric_value = result_dict[optimization_metric]
 
-                    # Store results
                     evaluated_params.append(params.copy())
                     all_results.append(result_dict)
 
@@ -466,7 +305,6 @@ class BacktestRunner:
                 print(f"Error in objective function: {e}")
                 return 1000.0
 
-        # Run Bayesian optimization
         result = gp_minimize(
             func=objective,
             dimensions=dimensions,
@@ -484,7 +322,6 @@ class BacktestRunner:
                 f"Best {optimization_metric}: {all_results[best_idx][optimization_metric]:.3f}")
             print(f"Best parameters: {evaluated_params[best_idx]}")
 
-        # Convert results to DataFrame
         if all_results:
             return pl.DataFrame(all_results)
         else:
@@ -509,7 +346,6 @@ class BacktestRunner:
         print(f"Total parameter combinations tested: {len(results):,}")
         print(f"Primary optimization metric: {optimization_metric}")
 
-        # Sort by optimization metric
         ascending = optimization_metric not in [
             "sharpe_ratio", "total_return_pct", "win_rate_pct"]
         sorted_results = results.sort(
@@ -534,7 +370,6 @@ class BacktestRunner:
         print(
             f"Average {optimization_metric}: {results[optimization_metric].mean():.3f}")
 
-        # Print best parameter combination
         best_row = sorted_results.head(1).to_dicts()[0]
         print(f"\nBEST PARAMETER COMBINATION:")
         param_columns = [col for col in results.columns if col.startswith(
@@ -561,19 +396,16 @@ class BacktestRunner:
         if len(results) == 0:
             return
 
-        # Sort by optimization metric and get best
         ascending = optimization_metric not in [
             "sharpe_ratio", "total_return_pct", "win_rate_pct"]
         sorted_results = results.sort(
             optimization_metric, descending=not ascending)
         best_row = sorted_results.head(1).to_dicts()[0]
 
-        # Extract parameter columns
         param_columns = [col for col in results.columns if col.startswith(
             ('bbands_', 'cvd_', 'atr_', 'sl_', 'tpsl_'))]
         best_params = {col: best_row[col] for col in param_columns}
 
-        # Add performance metrics and metadata
         best_params['performance'] = {
             'sharpe_ratio': best_row['sharpe_ratio'],
             'total_return_pct': best_row['total_return_pct'],
@@ -593,7 +425,6 @@ class BacktestRunner:
             'config_name': self.config_name
         }
 
-        # Save to file
         params_file = self.results_dir / \
             f"{self.config_name}_{method}_best_params.json"
         with open(params_file, 'w') as f:
@@ -602,13 +433,10 @@ class BacktestRunner:
         print(f"Best parameters saved to: {params_file}")
 
 
-# Example usage functions
 def example_grid_search():
     """Example: Run grid search optimization."""
-    # Create parameter selector
     param_selector = ParameterSelection()
 
-    # Create backtest runner
     runner = BacktestRunner(
         symbol="BTC-USDT-SWAP",
         start_date="2022-01-01",
@@ -619,7 +447,6 @@ def example_grid_search():
         risk_pct=1.0
     )
 
-    # Run grid search optimization
     results = runner.run_backtest(
         param_selector=param_selector,
         method="grid",
@@ -641,7 +468,6 @@ def example_random_search():
         timeframe="1h"
     )
 
-    # Run random search with 100 iterations
     results = runner.run_backtest(
         param_selector=param_selector,
         method="random",
@@ -664,7 +490,6 @@ def example_bayesian_optimization():
         timeframe="1h"
     )
 
-    # Run Bayesian optimization with 50 iterations
     results = runner.run_backtest(
         param_selector=param_selector,
         method="bayesian",
@@ -690,7 +515,6 @@ def example_custom_optimization():
         risk_pct=2.0
     )
 
-    # Optimize for total return instead of Sharpe ratio
     results = runner.run_backtest(
         param_selector=param_selector,
         method="random",
