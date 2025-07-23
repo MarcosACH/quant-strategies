@@ -36,11 +36,13 @@ from datetime import datetime, timezone
 from skopt import gp_minimize
 from skopt.utils import use_named_args
 
+
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
 try:
-    from src.optimization.parameters_selector import ParameterSelection
+    from src.data.pipeline.data_preparation import DataPreparationPipeline
+    from src.optimization.parameters_selector import ParametersSelection
     from src.strategies.implementations.cvd_bb_pullback import CVDBBPullbackStrategy
     from src.bt_engine.vectorbt_engine import VectorBTEngine
     from src.data.query.questdb_market_data_query import QuestDBMarketDataQuery
@@ -65,7 +67,10 @@ class BacktestRunner:
                  exchange: str = "OKX",
                  initial_cash: float = 1000,
                  fee_pct: float = 0.05,
-                 risk_pct: float = 1.0):
+                 risk_pct: float = 1.0,
+                 config_name: str = None,
+                 description: str = None
+                 ):
         """
         Initialize the backtest runner.
 
@@ -80,10 +85,18 @@ class BacktestRunner:
             risk_pct: Risk percentage for position sizing
         """
         self.symbol = symbol
-        self.start_date = datetime.strptime(
-            start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        self.end_date = datetime.strptime(
-            end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        try:
+            self.start_date = datetime.strptime(
+                start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            self.end_date = datetime.strptime(
+                end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError as e:
+            print(f"Error parsing dates: {e}")
+            sys.exit(1)
+
+        if start_date >= end_date:
+            print("Start date must be before end date")
+            sys.exit(1)
         self.timeframe = timeframe
         self.exchange = exchange
         self.initial_cash = initial_cash
@@ -95,7 +108,8 @@ class BacktestRunner:
         self.results_dir = Path("data/backtest_results")
         self.results_dir.mkdir(parents=True, exist_ok=True)
 
-        self.config_name = f"{symbol.lower().replace('-', '_')}_{timeframe}_{start_date.replace('-', '')}_{end_date.replace('-', '')}"
+        self.config_name = config_name or f"{symbol.lower().replace('-', '_')}_{timeframe}_{start_date.replace('-', '')}_{end_date.replace('-', '')}"
+        self.description = description or f"{symbol} {timeframe} data from {start_date} to {end_date}"
 
     def load_training_data(self) -> pl.DataFrame:
         """
@@ -110,55 +124,71 @@ class BacktestRunner:
             f"Period: {self.start_date.strftime('%Y-%m-%d')} to {self.end_date.strftime('%Y-%m-%d')}")
         print(f"Timeframe: {self.timeframe}")
 
-        try:
-            data = self.query_service.get_market_data(
-                symbol=self.symbol,
-                exchange=self.exchange,
-                start_date=self.start_date,
-                end_date=self.end_date,
-                timeframe=self.timeframe
-            )
+        split_config = DataSplitConfig(
+            train_pct=self.train_pct,
+            validation_pct=self.validation_pct,
+            test_pct=self.test_pct,
+            purge_days=1
+        )
 
-            if len(data) == 0:
-                raise ValueError("No data retrieved from QuestDB")
+        data_config = DataConfig(
+            symbol=self.symbol,
+            exchange=self.exchange,
+            start_date=self.start_date,
+            end_date=self.end_date,
+            timeframe=self.timeframe,
+            split_config=split_config,
+            config_name=self.config_name,
+            description=self.description
+        )
 
-            split_config = DataSplitConfig(
-                train_pct=1.0, validation_pct=0.0, test_pct=0.0)
-            config = DataConfig(
-                symbol=self.symbol,
-                exchange=self.exchange,
-                start_date=self.start_date,
-                end_date=self.end_date,
-                timeframe=self.timeframe,
-                split_config=split_config,
-                config_name=self.config_name,
-                description=f"Training data for {self.symbol}"
-            )
+        print("DATA CONFIGURATION")
+        print("=" * 50)
+        print(str(data_config))
 
-            validator = DataValidator(config)
-            validation_results = validator.validate_data_quality(data)
-
-            if not validation_results['is_valid']:
-                print("Data validation failed!")
-                for issue in validation_results['issues']:
-                    print(f"   • {issue}")
-                print("Attempting to clean data...")
-
-            cleaned_data = validator.clean_data(data)
-
-            print(f"Loaded {len(cleaned_data):,} records")
+        split_dates = data_config.get_split_dates()
+        print(f"\nSplit Dates:")
+        for split_name, (start, end) in split_dates.items():
+            duration = end - start
             print(
-                f"Date range: {cleaned_data['datetime'].min()} to {cleaned_data['datetime'].max()}")
+                f"   {split_name.upper():12} {start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')} ({duration.days} days)")
 
-            return cleaned_data
+        print(
+            f"\nExpected data points: {data_config.get_expected_data_points():,}")
+
+        print("\nREADY TO PREPARE DATA")
+        print("This will download and process the full dataset.")
+        response = input("Continue? (y/N): ").strip().lower()
+
+        if response != 'y':
+            print("Operation cancelled.")
+            return
+
+        pipeline = DataPreparationPipeline(data_config)
+
+        try:
+            print("\nStarting data preparation...")
+            prepared_datasets = pipeline.prepare_data(save_to_disk=False)
+
+            print("\nData preparation completed successfully!")
+
+            for split_name, dataset in prepared_datasets.items():
+                if len(dataset) > 0:
+                    print(f"\n{split_name.upper()} SET:")
+                    print(f"   Records: {len(dataset):,}")
+                    print(
+                        f"   Period: {dataset['timestamp'].min()} to {dataset['timestamp'].max()}")
+
+            print(f"\nReady to proceed to Phase 2: Strategy Development!")
+            print(
+                f"\nUse this configuration name in your notebooks: '{self.config_name}'")
 
         except Exception as e:
-            print(f"Error loading data from QuestDB: {e}")
-            print("Please ensure QuestDB is running and contains the required data")
-            raise
+            print(f"\nError during preparation: {e}")
+            sys.exit(1)
 
     def run_backtest(self,
-                     param_selector: ParameterSelection,
+                     param_selector: ParametersSelection,
                      method: str = "grid",
                      optimization_metric: str = "sharpe_ratio",
                      n_iter: int = 100,
@@ -435,7 +465,7 @@ class BacktestRunner:
 
 def example_grid_search():
     """Example: Run grid search optimization."""
-    param_selector = ParameterSelection()
+    param_selector = ParametersSelection()
 
     runner = BacktestRunner(
         symbol="BTC-USDT-SWAP",
@@ -459,7 +489,7 @@ def example_grid_search():
 
 def example_random_search():
     """Example: Run random search optimization."""
-    param_selector = ParameterSelection()
+    param_selector = ParametersSelection()
 
     runner = BacktestRunner(
         symbol="BTC-USDT-SWAP",
@@ -481,7 +511,7 @@ def example_random_search():
 
 def example_bayesian_optimization():
     """Example: Run Bayesian optimization."""
-    param_selector = ParameterSelection()
+    param_selector = ParametersSelection()
 
     runner = BacktestRunner(
         symbol="BTC-USDT-SWAP",
@@ -503,7 +533,7 @@ def example_bayesian_optimization():
 
 def example_custom_optimization():
     """Example: Run optimization with custom parameters and metric."""
-    param_selector = ParameterSelection()
+    param_selector = ParametersSelection()
 
     runner = BacktestRunner(
         symbol="ETH-USDT-SWAP",
