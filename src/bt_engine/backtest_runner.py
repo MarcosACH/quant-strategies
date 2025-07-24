@@ -226,7 +226,7 @@ class BacktestRunner:
         print(f"{'='*60}")
 
         if method == "grid":
-            param_ranges = param_selector.get_grid_search_params(reduced=True)
+            param_ranges = param_selector.get_grid_search_params()
             results = self._run_grid_search(engine, data, param_ranges)
 
         elif method == "random":
