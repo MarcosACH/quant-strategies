@@ -17,7 +17,7 @@ class ParametersSelection:
         """Initialize the parameter selector."""
         self.param_ranges = param_ranges
 
-    def get_grid_search_params(self, reduced: bool = True) -> Dict[str, List]:
+    def get_grid_search_params(self, reduced: bool = False) -> Dict[str, List]:
         """
         Get parameter ranges for grid search.
 
@@ -35,6 +35,7 @@ class ParametersSelection:
             print(
                 f"Grid search: {total_combinations:,} parameter combinations")
         else:
+            param_ranges = self.param_ranges
             total_combinations = np.prod(
                 [len(v) for v in param_ranges.values()])
             print(
