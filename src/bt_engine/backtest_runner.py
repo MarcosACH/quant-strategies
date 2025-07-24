@@ -192,7 +192,7 @@ class BacktestRunner:
             sys.exit(1)
 
     def run_backtest(self,
-                     param_selector: ParametersSelection,
+                     param_ranges: Dict[str, List],
                      method: str = "grid",
                      optimization_metric: str = "sharpe_ratio",
                      n_iter: int = 100,
@@ -224,6 +224,8 @@ class BacktestRunner:
         print(f"RUNNING {method.upper()} OPTIMIZATION")
         print(f"Optimization metric: {optimization_metric}")
         print(f"{'='*60}")
+
+        param_selector = ParametersSelection(param_ranges)
 
         if method == "grid":
             param_ranges = param_selector.get_grid_search_params()
