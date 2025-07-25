@@ -244,12 +244,12 @@ if __name__ == "__main__":
     # results = example_grid_search()
 
     # Example 2: Random Search (uncomment to run)
-    # print("Running Random Search Example...")
-    # results = example_random_search()
+    print("Running Random Search Example...")
+    results = example_random_search()
 
     # Example 3: Bayesian Optimization (uncomment to run)
-    print("Running Bayesian Optimization Example...")
-    results = example_bayesian_optimization()
+    # print("Running Bayesian Optimization Example...")
+    # results = example_bayesian_optimization()
 
     # Example 4: Custom optimization (uncomment to run)
     # print("Running Custom Optimization Example...")
