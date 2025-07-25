@@ -31,7 +31,7 @@ import numpy as np
 from pathlib import Path
 import time
 import json
-from typing import Dict, List
+from typing import Dict, List, Any
 from datetime import datetime, timezone
 from skopt import gp_minimize
 from skopt.utils import use_named_args
@@ -212,6 +212,10 @@ class BacktestRunner:
         """
         start_time = time.time()
 
+        if method == "random" and n_iter > np.prod([len(v) for v in param_ranges.values()]):
+            raise ValueError(
+                f"n_iter ({n_iter}) cannot be greater than the number of parameter combinations ({np.prod([len(v) for v in param_ranges.values()])})")
+
         data = self.load_training_data()
 
         engine = VectorBTEngine(
@@ -232,9 +236,9 @@ class BacktestRunner:
             results = self._run_grid_search(engine, data, param_ranges)
 
         elif method == "random":
-            param_ranges = param_selector.get_random_search_params(
+            param_combinations = param_selector.get_random_search_params(
                 n_iter=n_iter)
-            results = self._run_random_search(engine, data, param_ranges)
+            results = self._run_random_search(engine, data, param_combinations)
 
         elif method == "bayesian":
             dimensions, param_names = param_selector.get_bayesian_optimization_params(
@@ -265,8 +269,8 @@ class BacktestRunner:
         results = engine.simulate_portfolios(
             strategy=self.strategy,
             data=data,
-            param_dict=param_ranges,
             ticker=self.symbol,
+            param_dict=param_ranges,
             sizing_method="Risk percent",
             risk_pct=self.risk_pct,
             exchange_broker=self.exchange.lower(),
@@ -276,13 +280,13 @@ class BacktestRunner:
         )
         return results
 
-    def _run_random_search(self, engine: VectorBTEngine, data: pl.DataFrame, param_ranges: Dict[str, List]) -> pl.DataFrame:
+    def _run_random_search(self, engine: VectorBTEngine, data: pl.DataFrame, param_combinations: List[Dict[str, Any]]) -> pl.DataFrame:
         """Run random search optimization."""
         results = engine.simulate_portfolios(
             strategy=self.strategy,
             data=data,
-            param_dict=param_ranges,
             ticker=self.symbol,
+            param_combinations=param_combinations,
             sizing_method="Risk percent",
             risk_pct=self.risk_pct,
             exchange_broker=self.exchange.lower(),
@@ -312,8 +316,8 @@ class BacktestRunner:
                 results = engine.simulate_portfolios(
                     strategy=self.strategy,
                     data=data,
-                    param_dict=param_dict,
                     ticker=self.symbol,
+                    param_dict=param_dict,
                     sizing_method="Risk percent",
                     risk_pct=self.risk_pct,
                     exchange_broker=self.exchange.lower(),
