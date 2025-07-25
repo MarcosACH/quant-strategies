@@ -2,6 +2,7 @@ import gc
 import itertools
 import numpy as np
 import polars as pl
+from sklearn.model_selection import ParameterSampler
 import vectorbt as vbt
 from typing import Optional, List, Dict, Any, Iterator, Callable
 from joblib import Parallel, delayed
@@ -46,8 +47,9 @@ class VectorBTEngine:
         self,
         strategy,
         data: pl.DataFrame,
-        param_dict: Dict[str, Any],
         ticker: str,
+        param_dict: Optional[Dict[str, Any]] = None,
+        param_combinations: Optional[ParameterSampler] = None,
         sizing_method: str = "Value-based",
         risk_pct: float = np.nan,
         risk_nominal: float = np.nan,
@@ -85,6 +87,13 @@ class VectorBTEngine:
         Returns:
             DataFrame with backtest results
         """
+        if not param_dict and not param_combinations:
+            raise ValueError(
+                "Either param_dict or param_combinations must be provided")
+        if param_dict and param_combinations:
+            print(
+                "Warning: Both param_dict and param_combinations provided. Using param_dict only.")
+
         print(f"Starting {strategy.name} Backtesting...")
 
         stat_names = [
@@ -99,8 +108,11 @@ class VectorBTEngine:
             stat_names = [name for name in stat_names if name in stats_subset]
 
         total_combinations = 1
-        for values in param_dict.values():
-            total_combinations *= len(values)
+        if param_dict:
+            for values in param_dict.values():
+                total_combinations *= len(values)
+        else:
+            total_combinations = len(param_combinations)
 
         print(f"Total parameter combinations: {total_combinations}")
         print(f"Processing in indicator batches of {indicator_batch_size}")
@@ -132,11 +144,15 @@ class VectorBTEngine:
         with tqdm(total=total_combinations, desc="Backtesting Progress") as pbar:
             while True:
                 batch_params = []
-                for _ in range(indicator_batch_size):
-                    try:
-                        batch_params.append(next(param_generator))
-                    except StopIteration:
-                        break
+                if param_dict:
+                    for _ in range(indicator_batch_size):
+                        try:
+                            batch_params.append(next(param_generator))
+                        except StopIteration:
+                            break
+                else:
+                    batch_params = param_combinations[total_processed:
+                                                      total_processed + indicator_batch_size]
 
                 if not batch_params:
                     break
