@@ -70,16 +70,10 @@ class ParametersSelection:
 
         param_sampler = ParameterSampler(
             param_distributions, n_iter=n_iter, random_state=42)
-        param_combinations = list(param_sampler)
-
-        param_dict = {}
-        for param_name in param_ranges.keys():
-            param_dict[param_name] = [combo[param_name]
-                                      for combo in param_combinations]
 
         print(
-            f"Generated {len(param_combinations):,} random parameter combinations")
-        return param_dict
+            f"Generated {len(param_sampler):,} random parameter combinations")
+        return list(param_sampler)
 
     def get_bayesian_optimization_params(self,
                                          n_iter: int = 50,
