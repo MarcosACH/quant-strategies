@@ -97,10 +97,10 @@ def example_bayesian_optimization():
     param_ranges_small = {
         "bbands_length": np.arange(25, 150, 10),
         "bbands_stddev": np.arange(2.0, 6.0, 0.5),
-        "cvd_length": [40, 41],  # np.arange(35, 60, 5),
-        "atr_length": [10, 11],  # np.arange(5, 25, 5),
-        "sl_coef": [2.0, 2.1],  # np.arange(2.0, 3.5, 0.5),
-        "tpsl_ratio": [2.5, 2.6],  # np.arange(3.0, 5.5, 0.5)
+        "cvd_length": np.arange(35, 60, 5),
+        "atr_length": np.arange(5, 25, 5),
+        "sl_coef": np.arange(2.0, 3.5, 0.5),
+        "tpsl_ratio": np.arange(3.0, 5.5, 0.5)
     }
 
     runner = BacktestRunner(
@@ -120,40 +120,6 @@ def example_bayesian_optimization():
         method="bayesian",
         optimization_metric="sharpe_ratio",
         n_iter=50,
-        save_results=True
-    )
-
-    return results
-
-
-def example_custom_optimization():
-    """Example: Run optimization with custom parameters and metric."""
-    param_ranges_small = {
-        "bbands_length": np.arange(25, 150, 10),
-        "bbands_stddev": np.arange(2.0, 6.0, 0.5),
-        "cvd_length": [40],  # np.arange(35, 60, 5),
-        "atr_length": [10],  # np.arange(5, 25, 5),
-        "sl_coef": [2.0],  # np.arange(2.0, 3.5, 0.5),
-        "tpsl_ratio": [2.5],  # np.arange(3.0, 5.5, 0.5)
-    }
-
-    runner = BacktestRunner(
-        CVDBBPullbackStrategy(),
-        QuestDBMarketDataQuery(),
-        symbol="BTC-USDT-SWAP",
-        start_date="2022-01-01",
-        end_date="2022-12-31",
-        timeframe="1h",
-        initial_cash=1000,
-        fee_pct=0.05,
-        risk_pct=1.0
-    )
-
-    results = runner.run_backtest(
-        param_ranges=param_ranges_small,
-        method="random",
-        optimization_metric="total_return_pct",
-        n_iter=150,
         save_results=True
     )
 
@@ -206,7 +172,6 @@ def compare_optimization_methods():
         )
 
         if len(results) > 0:
-            # Get best result
             sorted_results = results.sort("sharpe_ratio", descending=True)
             best_result = sorted_results.head(1).to_dicts()[0]
 
@@ -244,12 +209,12 @@ if __name__ == "__main__":
     # results = example_grid_search()
 
     # Example 2: Random Search (uncomment to run)
-    print("Running Random Search Example...")
-    results = example_random_search()
+    # print("Running Random Search Example...")
+    # results = example_random_search()
 
     # Example 3: Bayesian Optimization (uncomment to run)
-    # print("Running Bayesian Optimization Example...")
-    # results = example_bayesian_optimization()
+    print("Running Bayesian Optimization Example...")
+    results = example_bayesian_optimization()
 
     # Example 4: Custom optimization (uncomment to run)
     # print("Running Custom Optimization Example...")
