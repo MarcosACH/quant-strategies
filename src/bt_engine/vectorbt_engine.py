@@ -230,7 +230,7 @@ class VectorBTEngine:
         short_tp_price_arr = ind.short_tp_price.to_numpy(dtype=np.float64)
         short_sl_price_arr = ind.short_sl_price.to_numpy(dtype=np.float64)
 
-        num_cols = ind.long_entries.shape[1]
+        num_cols = ind.long_entries.shape[1] if ind.long_entries.ndim > 1 else 1
         columns = ind.wrapper.columns
 
         rep_eval_str = "np.full(wrapper.shape_2d[1], dtype=exits_state, fill_value=False)"
@@ -239,12 +239,18 @@ class VectorBTEngine:
             delayed(self._simulate_single_portfolio)(
                 rep_eval_str, order_func_nb, exits_state,
                 (
-                    long_entries_arr[:, col],
-                    short_entries_arr[:, col],
-                    long_tp_price_arr[:, col],
-                    long_sl_price_arr[:, col],
-                    short_tp_price_arr[:, col],
-                    short_sl_price_arr[:, col],
+                    long_entries_arr[:,
+                                     col] if num_cols > 1 else long_entries_arr,
+                    short_entries_arr[:,
+                                      col] if num_cols > 1 else short_entries_arr,
+                    long_tp_price_arr[:,
+                                      col] if num_cols > 1 else long_tp_price_arr,
+                    long_sl_price_arr[:,
+                                      col] if num_cols > 1 else long_sl_price_arr,
+                    short_tp_price_arr[:,
+                                       col] if num_cols > 1 else short_tp_price_arr,
+                    short_sl_price_arr[:,
+                                       col] if num_cols > 1 else short_sl_price_arr,
                 ),
                 high_prices, low_prices, close_prices,
                 sizing_method, risk_pct, risk_nominal, position_size_value,
