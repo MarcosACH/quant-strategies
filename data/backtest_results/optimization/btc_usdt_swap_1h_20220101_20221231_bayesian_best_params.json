@@ -1,0 +1,19 @@
+{
+  "performance": {
+    "sharpe_ratio": 1.3117783356471153,
+    "total_return_pct": 10.612974282613745,
+    "max_drawdown_pct": 9.6780192360816,
+    "win_rate_pct": 23.076923076923077,
+    "total_trades": 27,
+    "optimization_metric": "sharpe_ratio",
+    "optimization_value": 1.3117783356471153
+  },
+  "metadata": {
+    "symbol": "BTC-USDT-SWAP",
+    "timeframe": "1h",
+    "start_date": "2022-01-01T00:00:00+00:00",
+    "end_date": "2022-12-31T00:00:00+00:00",
+    "method": "bayesian",
+    "config_name": "btc_usdt_swap_1h_20220101_20221231"
+  }
+}
