@@ -310,40 +310,35 @@ class BacktestRunner:
         @use_named_args(dimensions)
         def objective(**params):
             """Objective function to minimize."""
-            try:
-                param_dict = {name: [value] for name, value in params.items()}
+            param_dict = {name: [value] for name, value in params.items()}
 
-                results = engine.simulate_portfolios(
-                    strategy=self.strategy,
-                    data=data,
-                    ticker=self.symbol,
-                    param_dict=param_dict,
-                    sizing_method="Risk percent",
-                    risk_pct=self.risk_pct,
-                    exchange_broker=self.exchange.lower(),
-                    date_range="bayesian_opt",
-                    save_results=False,
-                    indicator_batch_size=1
-                )
+            results = engine.simulate_portfolios(
+                strategy=self.strategy,
+                data=data,
+                ticker=self.symbol,
+                param_dict=param_dict,
+                sizing_method="Risk percent",
+                risk_pct=self.risk_pct,
+                exchange_broker=self.exchange.lower(),
+                date_range="bayesian_opt",
+                save_results=False,
+                indicator_batch_size=1
+            )
 
-                if len(results) > 0:
-                    result_dict = results.to_dicts()[0]
-                    metric_value = result_dict[optimization_metric]
+            if len(results) > 0:
+                result_dict = results.to_dicts()[0]
+                metric_value = result_dict[optimization_metric]
 
-                    evaluated_params.append(params.copy())
-                    all_results.append(result_dict)
+                evaluated_params.append(params.copy())
+                all_results.append(result_dict)
 
-                    print(
-                        f"Iteration {len(evaluated_params)}: {optimization_metric} = {metric_value:.3f}")
+                print(
+                    f"Iteration {len(evaluated_params)}: {optimization_metric} = {metric_value:.3f}")
 
-                    # Return negative value for maximization (gp_minimize minimizes)
-                    return -metric_value if optimization_metric in ["sharpe_ratio", "total_return_pct", "win_rate_pct"] else metric_value
-                else:
-                    return 1000.0  # High penalty for failed backtests
-
-            except Exception as e:
-                print(f"Error in objective function: {e}")
-                return 1000.0
+                # Return negative value for maximization (gp_minimize minimizes)
+                return -metric_value if optimization_metric in ["sharpe_ratio", "total_return_pct", "win_rate_pct"] else metric_value
+            else:
+                return 1000.0  # High penalty for failed backtests
 
         result = gp_minimize(
             func=objective,
@@ -351,7 +346,8 @@ class BacktestRunner:
             n_calls=n_iter,
             random_state=42,
             acq_func='EI',  # Expected Improvement
-            n_initial_points=min(10, n_iter // 2)
+            n_initial_points=min(10, n_iter // 2),
+            n_jobs=-1
         )
 
         print(f"Bayesian optimization completed!")
