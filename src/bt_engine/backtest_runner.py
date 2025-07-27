@@ -117,6 +117,29 @@ class BacktestRunner:
         self.config_name = config_name or f"{symbol.lower().replace('-', '_')}_{timeframe}_{start_date.replace('-', '')}_{end_date.replace('-', '')}"
         self.description = description or f"{symbol} {timeframe} data from {start_date} to {end_date}"
 
+    def _format_duration_to_days_hms(self, duration) -> str:
+        """
+        Format a Polars Duration to days HH:MM:SS format.
+
+        Args:
+            duration: Polars Duration value
+
+        Returns:
+            String in format "X days HH:MM:SS" or "HH:MM:SS" if less than 1 day
+        """
+        if duration is None:
+            return None
+
+        total_seconds = duration.total_seconds()
+
+        days = int(total_seconds // 86400)
+        remaining_seconds = total_seconds % 86400
+        hours = int(remaining_seconds // 3600)
+        minutes = int((remaining_seconds % 3600) // 60)
+        seconds = int(remaining_seconds % 60)
+
+        return f"{days} days {hours:02d}:{minutes:02d}:{seconds:02d}"
+
     def load_training_data(self) -> pl.DataFrame:
         """
         Load training data from QuestDB.
@@ -408,17 +431,37 @@ class BacktestRunner:
 
         best_row = sorted_results.head(1).to_dicts()[0]
         print(f"\nBEST PARAMETER COMBINATION:")
-        param_columns = [col for col in results.columns if col.startswith(
-            ('bbands_', 'cvd_', 'atr_', 'sl_', 'tpsl_'))]
+        param_columns = [col for col in results.columns if any(param in col for param in [
+                                                               'bbands_length', 'bbands_stddev', 'cvd_length', 'atr_length', 'sl_coef', 'tpsl_ratio'])]
         for param in param_columns:
             print(f"   {param}: {best_row[param]}")
 
     def save_results(self, results: pl.DataFrame, method: str) -> None:
-        """Save results to parquet file."""
+        """Save results to csv file."""
         results_file = self.results_dir / \
-            f"{self.config_name}_{method}_results.parquet"
-        results.write_parquet(results_file)
+            f"{self.config_name}_{method}_results.csv"
+
+        for col in results.columns:
+            dtype = results[col].dtype
+
+            if dtype == pl.Duration:
+                results = results.with_columns(
+                    pl.col(col).map_elements(
+                        lambda x: self._format_duration_to_days_hms(
+                            x) if x is not None else None,
+                        return_dtype=pl.Utf8
+                    )
+                )
+
+        results.write_csv(results_file)
         print(f"\nResults saved to: {results_file}")
+
+        duration_cols = [col for col in results.columns
+                         if results[col].dtype == pl.Utf8 and len(results) > 0
+                         and any(str(val).count(':') == 2 for val in results[col].head(5) if val is not None)]
+        if duration_cols:
+            print(
+                f"Note: Duration columns {duration_cols} were converted to 'days HH:MM:SS' format for CSV compatibility")
 
     def save_best_parameters(self, results: pl.DataFrame, method: str, optimization_metric: str) -> None:
         """
@@ -438,8 +481,8 @@ class BacktestRunner:
             optimization_metric, descending=not ascending)
         best_row = sorted_results.head(1).to_dicts()[0]
 
-        param_columns = [col for col in results.columns if col.startswith(
-            ('bbands_', 'cvd_', 'atr_', 'sl_', 'tpsl_'))]
+        param_columns = [col for col in results.columns if any(param in col for param in [
+                                                               'bbands_length', 'bbands_stddev', 'cvd_length', 'atr_length', 'sl_coef', 'tpsl_ratio'])]
         best_params = {col: best_row[col] for col in param_columns}
 
         best_params['performance'] = {
