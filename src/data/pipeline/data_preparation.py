@@ -40,7 +40,7 @@ class DataPreparationPipeline:
         self.validator = DataValidator(config)
         self.results = {}
 
-    def prepare_data(self, save_to_disk: bool = True) -> Dict[str, pl.DataFrame]:
+    def prepare_data(self, save_to_disk: bool = False) -> Dict[str, pl.DataFrame]:
         """
         Execute the complete data preparation pipeline.
 
