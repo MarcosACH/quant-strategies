@@ -135,10 +135,10 @@ def compare_optimization_methods():
     param_ranges_small = {
         "bbands_length": np.arange(25, 150, 10),
         "bbands_stddev": np.arange(2.0, 6.0, 0.5),
-        "cvd_length": [40],  # np.arange(35, 60, 5),
-        "atr_length": [10],  # np.arange(5, 25, 5),
-        "sl_coef": [2.0],  # np.arange(2.0, 3.5, 0.5),
-        "tpsl_ratio": [2.5],  # np.arange(3.0, 5.5, 0.5)
+        "cvd_length": [40, 45],  # np.arange(35, 60, 5),
+        "atr_length": [10, 15],  # np.arange(5, 25, 5),
+        "sl_coef": [2.0, 2.5],  # np.arange(2.0, 3.5, 0.5),
+        "tpsl_ratio": [2.5, 3.0],  # np.arange(3.0, 5.5, 0.5)
     }
 
     runner = BacktestRunner(
@@ -205,17 +205,17 @@ if __name__ == "__main__":
     print("=" * 60)
 
     # Example 1: Grid Search
-    # print("Running Grid Search Example...")
-    # results = example_grid_search()
+    print("Running Grid Search Example...")
+    results = example_grid_search()
 
     # Example 2: Random Search (uncomment to run)
     # print("Running Random Search Example...")
     # results = example_random_search()
 
     # Example 3: Bayesian Optimization (uncomment to run)
-    print("Running Bayesian Optimization Example...")
-    results = example_bayesian_optimization()
+    # print("Running Bayesian Optimization Example...")
+    # results = example_bayesian_optimization()
 
     # Example 4: Custom optimization (uncomment to run)
     # print("Running Custom Optimization Example...")
-    # results = example_custom_optimization()
+    # results = compare_optimization_methods()
