@@ -29,10 +29,10 @@ Usage:
     )
 """
 
-import numpy as np
+import sys
 import polars as pl
-from typing import Dict, List, Tuple, Optional, Any, Union
-from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Any, Union
+from datetime import datetime
 from pathlib import Path
 import json
 import time
@@ -44,8 +44,39 @@ from .cross_validator import (
     CVSummary
 )
 from .parameters_selector import ParametersSelection
-from ..bt_engine.backtest_runner import BacktestRunner
-from ..bt_engine.vectorbt_engine import VectorBTEngine
+
+project_root = Path(__file__).parent.parent
+sys.path.append(str(project_root))
+
+# Use lazy imports to avoid circular dependencies
+_BacktestRunner = None
+_VectorBTEngine = None
+
+
+def _get_backtest_runner():
+    """Lazy import of BacktestRunner to avoid circular dependencies."""
+    global _BacktestRunner
+    if _BacktestRunner is None:
+        try:
+            from bt_engine.backtest_runner import BacktestRunner
+            _BacktestRunner = BacktestRunner
+        except ImportError as e:
+            print(f"Error importing BacktestRunner: {e}")
+            raise
+    return _BacktestRunner
+
+
+def _get_vectorbt_engine():
+    """Lazy import of VectorBTEngine to avoid circular dependencies."""
+    global _VectorBTEngine
+    if _VectorBTEngine is None:
+        try:
+            from bt_engine.vectorbt_engine import VectorBTEngine
+            _VectorBTEngine = VectorBTEngine
+        except ImportError as e:
+            print(f"Error importing VectorBTEngine: {e}")
+            raise
+    return _VectorBTEngine
 
 
 @dataclass
@@ -63,11 +94,11 @@ class CVOptimizationResult:
 class CVIntegratedOptimizer:
     """
     Integrated optimizer that combines parameter optimization with cross-validation.
-    
+
     This class provides a complete workflow for robust parameter selection using
     time-series cross-validation methods.
     """
-    
+
     def __init__(self,
                  strategy,
                  query_service,
@@ -84,7 +115,7 @@ class CVIntegratedOptimizer:
                  test_pct: float = 0.2):
         """
         Initialize the CV-integrated optimizer.
-        
+
         Args:
             strategy: Trading strategy instance
             query_service: Data query service
@@ -110,13 +141,12 @@ class CVIntegratedOptimizer:
         self.initial_cash = initial_cash
         self.fee_pct = fee_pct
         self.risk_pct = risk_pct
-        
-        # Data split configuration
+
         self.train_pct = train_pct
         self.validation_pct = validation_pct
         self.test_pct = test_pct
-        
-        # Initialize BacktestRunner for data loading
+
+        BacktestRunner = _get_backtest_runner()
         self.runner = BacktestRunner(
             strategy=strategy,
             query_service=query_service,
@@ -132,34 +162,34 @@ class CVIntegratedOptimizer:
             validation_pct=validation_pct,
             test_pct=test_pct
         )
-        
-        # Initialize VectorBT engine
+
+        VectorBTEngine = _get_vectorbt_engine()
         self.engine = VectorBTEngine(
             initial_cash=initial_cash,
             fee_pct=fee_pct,
             frequency=timeframe
         )
-        
-        # Results storage
+
         self.results_dir = Path("data/backtest_results/cv_optimization")
         self.results_dir.mkdir(parents=True, exist_ok=True)
-    
+
     def run_cv_optimization(self,
-                           param_ranges: Dict[str, List],
-                           cv_method: Union[str, ValidationMethod] = "rolling_window",
-                           n_splits: int = 5,
-                           train_size_months: int = 6,
-                           test_size_months: int = 2,
-                           initial_train_months: int = 6,
-                           purge_days: int = 1,
-                           optimization_metric: str = "sharpe_ratio",
-                           param_selection_method: str = "random",
-                           n_param_combinations: int = 20,
-                           save_results: bool = True,
-                           run_final_validation: bool = True) -> CVOptimizationResult:
+                            param_ranges: Dict[str, List],
+                            cv_method: Union[str,
+                                             ValidationMethod] = "rolling_window",
+                            n_splits: int = 5,
+                            train_size_months: int = 6,
+                            test_size_months: int = 2,
+                            initial_train_months: int = 6,
+                            purge_days: int = 1,
+                            optimization_metric: str = "sharpe_ratio",
+                            param_selection_method: str = "random",
+                            n_param_combinations: int = 20,
+                            save_results: bool = True,
+                            run_final_validation: bool = True) -> CVOptimizationResult:
         """
         Run complete cross-validation based optimization.
-        
+
         Args:
             param_ranges: Parameter ranges to optimize
             cv_method: Cross-validation method
@@ -173,7 +203,7 @@ class CVIntegratedOptimizer:
             n_param_combinations: Number of parameter combinations to test
             save_results: Whether to save results
             run_final_validation: Whether to run final validation on test set
-            
+
         Returns:
             CVOptimizationResult with optimization results
         """
@@ -185,22 +215,19 @@ class CVIntegratedOptimizer:
         print(f"CV Method: {cv_method}")
         print(f"Optimization Metric: {optimization_metric}")
         print(f"Parameter Selection: {param_selection_method}")
-        
+
         start_time = time.time()
-        
-        # Load data
+
         print(f"\nLoading data...")
         data = self.runner.load_training_data()
         print(f"Data loaded: {len(data):,} records")
-        
-        # Generate parameter combinations
+
         print(f"\nGenerating parameter combinations...")
         param_selector = ParametersSelection(param_ranges)
-        
+
         if param_selection_method == "grid":
-            # Use reduced grid for CV (full grid would be too slow)
-            param_combinations = param_selector.get_grid_search_params(reduced=True)
-            # Convert to list format expected by CV
+            param_combinations = param_selector.get_grid_search_params(
+                reduced=True)
             param_combinations = self._grid_to_combinations(param_combinations)
         elif param_selection_method == "random":
             param_combinations = param_selector.get_random_search_params(
@@ -212,15 +239,15 @@ class CVIntegratedOptimizer:
                 n_iter=n_param_combinations
             )
         else:
-            raise ValueError(f"Unknown parameter selection method: {param_selection_method}")
-        
+            raise ValueError(
+                f"Unknown parameter selection method: {param_selection_method}")
+
         print(f"Generated {len(param_combinations)} parameter combinations")
-        
-        # Set up cross-validator
+
         print(f"\nSetting up cross-validator...")
         if isinstance(cv_method, str):
             cv_method = ValidationMethod(cv_method)
-            
+
         cv = TimeSeriesCrossValidator(
             strategy=self.strategy,
             engine=self.engine,
@@ -231,8 +258,7 @@ class CVIntegratedOptimizer:
             initial_train_months=initial_train_months,
             purge_days=purge_days
         )
-        
-        # Run cross-validation
+
         print(f"\nRunning cross-validation...")
         cv_summary = cv.cross_validate(
             data=data,
@@ -241,8 +267,7 @@ class CVIntegratedOptimizer:
             save_results=save_results,
             config_name=f"cv_opt_{self.symbol}_{cv_method.value}"
         )
-        
-        # Final validation on hold-out test set
+
         final_validation_results = None
         if run_final_validation and cv_summary.best_parameters:
             print(f"\nRunning final validation on hold-out test set...")
@@ -250,8 +275,7 @@ class CVIntegratedOptimizer:
                 cv_summary.best_parameters,
                 optimization_metric
             )
-        
-        # Create optimization result
+
         result = CVOptimizationResult(
             cv_summary=cv_summary,
             best_parameters=cv_summary.best_parameters,
@@ -269,102 +293,98 @@ class CVIntegratedOptimizer:
             },
             final_validation_results=final_validation_results
         )
-        
-        # Print summary
+
         self._print_optimization_summary(result)
-        
-        # Save comprehensive results
+
         if save_results:
             self._save_optimization_results(result)
-        
+
         end_time = time.time()
         duration = end_time - start_time
         print(f"\nOptimization completed in {duration:.2f} seconds")
-        
+
         return result
-    
+
     def compare_cv_methods(self,
-                          param_ranges: Dict[str, List],
-                          optimization_metric: str = "sharpe_ratio",
-                          n_param_combinations: int = 10,
-                          save_results: bool = True) -> Dict[str, CVOptimizationResult]:
+                           param_ranges: Dict[str, List],
+                           optimization_metric: str = "sharpe_ratio",
+                           n_param_combinations: int = 10,
+                           save_results: bool = True) -> Dict[str, CVOptimizationResult]:
         """
         Compare different cross-validation methods on the same parameter space.
-        
+
         Args:
             param_ranges: Parameter ranges to test
             optimization_metric: Metric to optimize
             n_param_combinations: Number of parameter combinations to test
             save_results: Whether to save results
-            
+
         Returns:
             Dictionary mapping CV method names to optimization results
         """
         print(f"\n{'='*80}")
         print(f"CROSS-VALIDATION METHODS COMPARISON")
         print(f"{'='*80}")
-        
+
         methods_to_compare = [
             ("rolling_window", ValidationMethod.ROLLING_WINDOW),
             ("expanding_window", ValidationMethod.EXPANDING_WINDOW),
             ("blocked_timeseries", ValidationMethod.BLOCKED_TIMESERIES)
         ]
-        
+
         comparison_results = {}
-        
+
         for method_name, method in methods_to_compare:
             print(f"\nTesting {method_name.upper()} method...")
-            
+
             result = self.run_cv_optimization(
                 param_ranges=param_ranges,
                 cv_method=method,
-                n_splits=4,  # Fewer splits for comparison
+                n_splits=4,
                 optimization_metric=optimization_metric,
                 param_selection_method="random",
                 n_param_combinations=n_param_combinations,
                 save_results=save_results,
-                run_final_validation=False  # Skip for comparison
+                run_final_validation=False
             )
-            
+
             comparison_results[method_name] = result
-        
-        # Print comparison summary
+
         self._print_methods_comparison(comparison_results, optimization_metric)
-        
+
         if save_results:
             self._save_methods_comparison(comparison_results)
-        
+
         return comparison_results
-    
-    def run_robust_optimization_workflow(self,
-                                       param_ranges: Dict[str, List],
-                                       optimization_metric: str = "sharpe_ratio") -> Dict[str, Any]:
+
+    def run_complete_optimization_workflow(self,
+                                           param_ranges: Dict[str, List],
+                                           optimization_metric: str = "sharpe_ratio") -> Dict[str, Any]:
         """
         Run a complete robust optimization workflow with multiple validation stages.
-        
+
         This implements a multi-stage validation process:
         1. Initial parameter screening with blocked CV
         2. Refined testing with rolling window CV  
         3. Final validation with expanding window CV
         4. Out-of-sample testing on hold-out set
-        
+
         Args:
             param_ranges: Parameter ranges to optimize
             optimization_metric: Metric to optimize
-            
+
         Returns:
             Dictionary with results from all stages
         """
         print(f"\n{'='*80}")
         print(f"ROBUST OPTIMIZATION WORKFLOW")
         print(f"{'='*80}")
-        
+
         workflow_results = {}
-        
-        # Stage 1: Initial screening with blocked CV
+
         print(f"\nSTAGE 1: Initial Parameter Screening (Blocked CV)")
         print("-" * 60)
-        
+
         stage1_result = self.run_cv_optimization(
             param_ranges=param_ranges,
             cv_method=ValidationMethod.BLOCKED_TIMESERIES,
@@ -375,20 +395,18 @@ class CVIntegratedOptimizer:
             save_results=True,
             run_final_validation=False
         )
-        
+
         workflow_results['stage1_screening'] = stage1_result
-        
-        # Stage 2: Refined testing with top parameters
+
         print(f"\nSTAGE 2: Refined Testing (Rolling Window CV)")
         print("-" * 60)
-        
-        # Create refined parameter space around best parameters
+
         if stage1_result.best_parameters:
             refined_ranges = self._create_refined_param_ranges(
                 stage1_result.best_parameters,
                 original_ranges=param_ranges
             )
-            
+
             stage2_result = self.run_cv_optimization(
                 param_ranges=refined_ranges,
                 cv_method=ValidationMethod.ROLLING_WINDOW,
@@ -401,23 +419,21 @@ class CVIntegratedOptimizer:
                 save_results=True,
                 run_final_validation=False
             )
-            
+
             workflow_results['stage2_refined'] = stage2_result
         else:
             print("No valid parameters found in stage 1, skipping stage 2")
             workflow_results['stage2_refined'] = None
             stage2_result = None
-        
-        # Stage 3: Final validation with expanding window
+
         print(f"\nSTAGE 3: Final Validation (Expanding Window CV)")
         print("-" * 60)
-        
+
         if stage2_result and stage2_result.best_parameters:
-            # Test only the best parameters from stage 2
             best_param_ranges = {
                 param: [value] for param, value in stage2_result.best_parameters.items()
             }
-            
+
             stage3_result = self.run_cv_optimization(
                 param_ranges=best_param_ranges,
                 cv_method=ValidationMethod.EXPANDING_WINDOW,
@@ -427,176 +443,184 @@ class CVIntegratedOptimizer:
                 optimization_metric=optimization_metric,
                 param_selection_method="grid",
                 save_results=True,
-                run_final_validation=True  # Include final validation
+                run_final_validation=True
             )
-            
+
             workflow_results['stage3_final'] = stage3_result
         else:
             print("No valid parameters from stage 2, skipping stage 3")
             workflow_results['stage3_final'] = None
             stage3_result = None
-        
-        # Print workflow summary
+
         self._print_workflow_summary(workflow_results, optimization_metric)
-        
-        # Save workflow results
+
         self._save_workflow_results(workflow_results)
-        
+
         return workflow_results
-    
+
     def _grid_to_combinations(self, param_grid: Dict[str, List]) -> List[Dict[str, Any]]:
         """Convert parameter grid to list of combinations."""
         import itertools
-        
+
         param_names = list(param_grid.keys())
         param_values = list(param_grid.values())
-        
+
         combinations = []
         for combination in itertools.product(*param_values):
             param_dict = dict(zip(param_names, combination))
             combinations.append(param_dict)
-        
+
         return combinations
-    
-    def _run_final_validation(self, 
-                             best_parameters: Dict[str, Any],
-                             optimization_metric: str) -> pl.DataFrame:
+
+    def _run_final_validation(self,
+                              best_parameters: Dict[str, Any],
+                              optimization_metric: str) -> pl.DataFrame:
         """Run final validation on hold-out test set."""
-        
+
         # This would use the test split from your data configuration
         # For now, we'll simulate this by using the existing runner
         results = self.runner.run_backtest(
-            param_ranges={param: [value] for param, value in best_parameters.items()},
+            param_ranges={param: [value]
+                          for param, value in best_parameters.items()},
             method="grid",
             optimization_metric=optimization_metric,
             save_results=False
         )
-        
+
         if len(results) > 0:
             final_result = results.head(1)
-            print(f"Final validation {optimization_metric}: {final_result[optimization_metric].item():.4f}")
+            print(
+                f"Final validation {optimization_metric}: {final_result[optimization_metric].item():.4f}")
             return final_result
         else:
             print("Final validation failed - no results generated")
             return pl.DataFrame()
-    
-    def _create_refined_param_ranges(self, 
-                                   best_params: Dict[str, Any],
-                                   original_ranges: Dict[str, List],
-                                   refinement_factor: float = 0.2) -> Dict[str, List]:
+
+    def _create_refined_param_ranges(self,
+                                     best_params: Dict[str, Any],
+                                     original_ranges: Dict[str, List],
+                                     refinement_factor: float = 0.2) -> Dict[str, List]:
         """Create refined parameter ranges around best parameters."""
         refined_ranges = {}
-        
+
         for param, best_value in best_params.items():
             if param in original_ranges:
                 original_range = original_ranges[param]
-                
+
                 if isinstance(best_value, (int, float)):
-                    # Create range around best value
-                    range_size = (max(original_range) - min(original_range)) * refinement_factor
-                    
+                    range_size = (max(original_range) -
+                                  min(original_range)) * refinement_factor
+
                     if isinstance(best_value, int):
-                        refined_min = max(min(original_range), int(best_value - range_size))
-                        refined_max = min(max(original_range), int(best_value + range_size))
-                        refined_ranges[param] = list(range(refined_min, refined_max + 1, 
-                                                         max(1, (refined_max - refined_min) // 5)))
+                        refined_min = max(min(original_range),
+                                          int(best_value - range_size))
+                        refined_max = min(max(original_range),
+                                          int(best_value + range_size))
+                        refined_ranges[param] = list(range(refined_min, refined_max + 1,
+                                                           max(1, (refined_max - refined_min) // 5)))
                     else:
-                        refined_min = max(min(original_range), best_value - range_size)
-                        refined_max = min(max(original_range), best_value + range_size)
+                        refined_min = max(min(original_range),
+                                          best_value - range_size)
+                        refined_max = min(max(original_range),
+                                          best_value + range_size)
                         step = (refined_max - refined_min) / 5
-                        refined_ranges[param] = [round(refined_min + i * step, 2) 
-                                               for i in range(6)]
+                        refined_ranges[param] = [round(refined_min + i * step, 2)
+                                                 for i in range(6)]
                 else:
-                    # Keep original range for non-numeric parameters
                     refined_ranges[param] = original_range
             else:
-                # Parameter not in original ranges, use single best value
                 refined_ranges[param] = [best_value]
-        
+
         return refined_ranges
-    
+
     def _print_optimization_summary(self, result: CVOptimizationResult):
         """Print optimization summary."""
         print(f"\n{'='*60}")
         print(f"OPTIMIZATION SUMMARY")
         print(f"{'='*60}")
-        
+
         print(f"Validation Method: {result.validation_method}")
         print(f"CV Score: {result.cv_score:.4f} ± {result.cv_std:.4f}")
-        
+
         if result.cv_summary.statistical_significance:
             sig = result.cv_summary.statistical_significance
-            print(f"Statistical Significance: {'Yes' if sig.get('is_significant', False) else 'No'}")
+            print(
+                f"Statistical Significance: {'Yes' if sig.get('is_significant', False) else 'No'}")
             print(f"P-Value: {sig.get('p_value', 'N/A')}")
-        
+
         print(f"\nBest Parameters:")
         for param, value in result.best_parameters.items():
             print(f"  {param}: {value}")
-        
+
         if result.final_validation_results is not None and len(result.final_validation_results) > 0:
-            final_score = result.final_validation_results[result.optimization_details['optimization_metric']].item()
+            final_score = result.final_validation_results[result.optimization_details['optimization_metric']].item(
+            )
             print(f"\nFinal Validation Score: {final_score:.4f}")
-    
-    def _print_methods_comparison(self, 
-                                 comparison_results: Dict[str, CVOptimizationResult],
-                                 optimization_metric: str):
+
+    def _print_methods_comparison(self,
+                                  comparison_results: Dict[str, CVOptimizationResult],
+                                  optimization_metric: str):
         """Print comparison of CV methods."""
         print(f"\n{'='*80}")
         print(f"CROSS-VALIDATION METHODS COMPARISON")
         print(f"{'='*80}")
-        
-        print(f"{'Method':<20} {'CV Score':<15} {'Std Dev':<10} {'Significant':<12} {'Best Score':<12}")
+
+        print(
+            f"{'Method':<20} {'CV Score':<15} {'Std Dev':<10} {'Significant':<12} {'Best Score':<12}")
         print("-" * 80)
-        
+
         for method_name, result in comparison_results.items():
-            sig_text = "Yes" if result.cv_summary.statistical_significance.get('is_significant', False) else "No"
+            sig_text = "Yes" if result.cv_summary.statistical_significance.get(
+                'is_significant', False) else "No"
             print(f"{method_name:<20} "
                   f"{result.cv_score:.3f} ± {result.cv_std:.3f}   "
                   f"{result.cv_std:<10.3f} "
                   f"{sig_text:<12} "
                   f"{result.cv_summary.best_cv_score:<12.3f}")
-    
-    def _print_workflow_summary(self, 
-                               workflow_results: Dict[str, Any],
-                               optimization_metric: str):
+
+    def _print_workflow_summary(self,
+                                workflow_results: Dict[str, Any],
+                                optimization_metric: str):
         """Print workflow summary."""
         print(f"\n{'='*80}")
         print(f"ROBUST OPTIMIZATION WORKFLOW SUMMARY")
         print(f"{'='*80}")
-        
+
         for stage_name, result in workflow_results.items():
             if result is not None:
                 print(f"\n{stage_name.upper()}:")
-                print(f"  CV Score: {result.cv_score:.4f} ± {result.cv_std:.4f}")
+                print(
+                    f"  CV Score: {result.cv_score:.4f} ± {result.cv_std:.4f}")
                 if result.cv_summary.statistical_significance:
-                    sig = result.cv_summary.statistical_significance.get('is_significant', False)
+                    sig = result.cv_summary.statistical_significance.get(
+                        'is_significant', False)
                     print(f"  Significant: {'Yes' if sig else 'No'}")
-                
+
                 if result.final_validation_results is not None and len(result.final_validation_results) > 0:
-                    final_score = result.final_validation_results[optimization_metric].item()
+                    final_score = result.final_validation_results[optimization_metric].item(
+                    )
                     print(f"  Final Validation: {final_score:.4f}")
-        
-        # Overall assessment
+
         if workflow_results.get('stage3_final'):
             final_result = workflow_results['stage3_final']
             print(f"\nOVERALL ASSESSMENT:")
             print(f"Recommended Parameters: {final_result.best_parameters}")
-            print(f"Expected Performance: {final_result.cv_score:.4f} ± {final_result.cv_std:.4f}")
-            
+            print(
+                f"Expected Performance: {final_result.cv_score:.4f} ± {final_result.cv_std:.4f}")
+
             if final_result.cv_summary.statistical_significance.get('is_significant', False):
                 print(f"Status: ✓ READY FOR DEPLOYMENT")
             else:
                 print(f"Status: ⚠ NEEDS FURTHER VALIDATION")
         else:
             print(f"\nOVERALL ASSESSMENT: ✗ OPTIMIZATION FAILED")
-    
+
     def _save_optimization_results(self, result: CVOptimizationResult):
         """Save optimization results."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"cv_optimization_{self.symbol}_{result.validation_method}_{timestamp}.json"
         filepath = self.results_dir / filename
-        
-        # Prepare data for JSON serialization
+
         data = {
             'symbol': self.symbol,
             'period': f"{self.start_date} to {self.end_date}",
@@ -609,28 +633,28 @@ class CVIntegratedOptimizer:
             'confidence_interval': result.cv_summary.confidence_interval,
             'timestamp': timestamp
         }
-        
+
         if result.final_validation_results is not None and len(result.final_validation_results) > 0:
             data['final_validation'] = result.final_validation_results.to_dicts()
-        
+
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=2, default=str)
-        
+
         print(f"Optimization results saved: {filepath}")
-    
+
     def _save_methods_comparison(self, comparison_results: Dict[str, CVOptimizationResult]):
         """Save methods comparison results."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"cv_methods_comparison_{self.symbol}_{timestamp}.json"
         filepath = self.results_dir / filename
-        
+
         data = {
             'symbol': self.symbol,
             'period': f"{self.start_date} to {self.end_date}",
             'timestamp': timestamp,
             'methods': {}
         }
-        
+
         for method_name, result in comparison_results.items():
             data['methods'][method_name] = {
                 'cv_score': result.cv_score,
@@ -638,25 +662,25 @@ class CVIntegratedOptimizer:
                 'best_parameters': result.best_parameters,
                 'statistical_significance': result.cv_summary.statistical_significance
             }
-        
+
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=2, default=str)
-        
+
         print(f"Methods comparison saved: {filepath}")
-    
+
     def _save_workflow_results(self, workflow_results: Dict[str, Any]):
         """Save workflow results."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"robust_workflow_{self.symbol}_{timestamp}.json"
         filepath = self.results_dir / filename
-        
+
         data = {
             'symbol': self.symbol,
             'period': f"{self.start_date} to {self.end_date}",
             'timestamp': timestamp,
             'stages': {}
         }
-        
+
         for stage_name, result in workflow_results.items():
             if result is not None:
                 data['stages'][stage_name] = {
@@ -666,11 +690,11 @@ class CVIntegratedOptimizer:
                     'validation_method': result.validation_method,
                     'statistical_significance': result.cv_summary.statistical_significance
                 }
-                
+
                 if result.final_validation_results is not None and len(result.final_validation_results) > 0:
                     data['stages'][stage_name]['final_validation'] = result.final_validation_results.to_dicts()
-        
+
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=2, default=str)
-        
+
         print(f"Workflow results saved: {filepath}")
