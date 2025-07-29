@@ -42,13 +42,28 @@ sys.path.append(str(project_root))
 
 try:
     from src.data.pipeline.data_preparation import DataPreparationPipeline
-    from src.optimization.parameters_selector import ParametersSelection
     from src.bt_engine.vectorbt_engine import VectorBTEngine
     from src.data.config.data_config import DataConfig, DataSplitConfig
 except ImportError as e:
     print(f"Error importing modules: {e}")
     print(f"Make sure you're running from the project root or the modules exist.")
     sys.exit(1)
+
+# Lazy import to avoid circular dependencies
+_ParametersSelection = None
+
+
+def _get_parameters_selection():
+    """Lazy import of ParametersSelection to avoid circular dependencies."""
+    global _ParametersSelection
+    if _ParametersSelection is None:
+        try:
+            from src.optimization.parameters_selector import ParametersSelection
+            _ParametersSelection = ParametersSelection
+        except ImportError as e:
+            print(f"Error importing ParametersSelection: {e}")
+            raise
+    return _ParametersSelection
 
 
 class BacktestRunner:
@@ -252,6 +267,7 @@ class BacktestRunner:
         print(f"Optimization metric: {optimization_metric}")
         print(f"{'='*60}")
 
+        ParametersSelection = _get_parameters_selection()
         param_selector = ParametersSelection(param_ranges)
 
         if method == "grid":
