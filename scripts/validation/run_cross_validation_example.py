@@ -21,7 +21,6 @@ import numpy as np
 import polars as pl
 from datetime import datetime
 
-# Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
@@ -49,16 +48,14 @@ def example_rolling_window_cv():
     print("\n" + "=" * 80)
     print("EXAMPLE 1: ROLLING WINDOW CROSS-VALIDATION")
     print("=" * 80)
-    
-    # Set up strategy and engine
+
     strategy = CVDBBPullbackStrategy()
     engine = VectorBTEngine(
         initial_cash=1000,
         fee_pct=0.05,
         frequency="1h"
     )
-    
-    # Load data using BacktestRunner's data loading functionality
+
     runner = BacktestRunner(
         strategy=strategy,
         query_service=QuestDBMarketDataQuery(),
@@ -70,10 +67,9 @@ def example_rolling_window_cv():
         fee_pct=0.05,
         risk_pct=1.0
     )
-    
+
     data = runner.load_training_data()
-    
-    # Define parameter combinations to test
+
     param_ranges = {
         "bbands_length": [30, 50, 70],
         "bbands_stddev": [2.0, 2.5, 3.0],
@@ -82,24 +78,21 @@ def example_rolling_window_cv():
         "sl_coef": [2.0, 2.5],
         "tpsl_ratio": [2.0, 2.5]
     }
-    
-    # Generate parameter combinations (using subset for demonstration)
+
     param_selector = ParametersSelection(param_ranges)
     param_combinations = param_selector.get_random_search_params(n_iter=8)
-    
-    # Set up cross-validator
+
     cv = TimeSeriesCrossValidator(
         strategy=strategy,
         engine=engine,
         validation_method=ValidationMethod.ROLLING_WINDOW,
         n_splits=4,
-        train_size_months=4,  # 4-month training windows
-        test_size_months=1,   # 1-month test windows
+        train_size_months=4,
+        test_size_months=1,
         purge_days=1,
         embargo_days=0
     )
-    
-    # Run cross-validation
+
     results = cv.cross_validate(
         data=data,
         param_combinations=param_combinations,
@@ -107,7 +100,7 @@ def example_rolling_window_cv():
         save_results=True,
         config_name="rolling_window_cv_example"
     )
-    
+
     return results
 
 
@@ -116,16 +109,14 @@ def example_expanding_window_cv():
     print("\n" + "=" * 80)
     print("EXAMPLE 2: EXPANDING WINDOW CROSS-VALIDATION")
     print("=" * 80)
-    
-    # Set up strategy and engine
+
     strategy = CVDBBPullbackStrategy()
     engine = VectorBTEngine(
         initial_cash=1000,
         fee_pct=0.05,
         frequency="1h"
     )
-    
-    # Load data
+
     runner = BacktestRunner(
         strategy=strategy,
         query_service=QuestDBMarketDataQuery(),
@@ -137,28 +128,28 @@ def example_expanding_window_cv():
         fee_pct=0.05,
         risk_pct=1.0
     )
-    
+
     data = runner.load_training_data()
-    
-    # Define parameter combinations (smaller set for demonstration)
+
     param_combinations = [
-        {"bbands_length": 30, "bbands_stddev": 2.0, "cvd_length": 40, "atr_length": 10, "sl_coef": 2.0, "tpsl_ratio": 2.0},
-        {"bbands_length": 50, "bbands_stddev": 2.5, "cvd_length": 50, "atr_length": 14, "sl_coef": 2.5, "tpsl_ratio": 2.5},
-        {"bbands_length": 70, "bbands_stddev": 3.0, "cvd_length": 40, "atr_length": 10, "sl_coef": 2.0, "tpsl_ratio": 3.0},
+        {"bbands_length": 30, "bbands_stddev": 2.0, "cvd_length": 40,
+            "atr_length": 10, "sl_coef": 2.0, "tpsl_ratio": 2.0},
+        {"bbands_length": 50, "bbands_stddev": 2.5, "cvd_length": 50,
+            "atr_length": 14, "sl_coef": 2.5, "tpsl_ratio": 2.5},
+        {"bbands_length": 70, "bbands_stddev": 3.0, "cvd_length": 40,
+            "atr_length": 10, "sl_coef": 2.0, "tpsl_ratio": 3.0},
     ]
-    
-    # Set up cross-validator with expanding windows
+
     cv = TimeSeriesCrossValidator(
         strategy=strategy,
         engine=engine,
         validation_method=ValidationMethod.EXPANDING_WINDOW,
         n_splits=4,
-        initial_train_months=3,  # Start with 3-month training window
-        test_size_months=1,      # 1-month test windows
+        initial_train_months=3,
+        test_size_months=1,
         purge_days=1
     )
-    
-    # Run cross-validation
+
     results = cv.cross_validate(
         data=data,
         param_combinations=param_combinations,
@@ -166,7 +157,7 @@ def example_expanding_window_cv():
         save_results=True,
         config_name="expanding_window_cv_example"
     )
-    
+
     return results
 
 
@@ -175,16 +166,14 @@ def example_blocked_timeseries_cv():
     print("\n" + "=" * 80)
     print("EXAMPLE 3: BLOCKED TIME-SERIES CROSS-VALIDATION")
     print("=" * 80)
-    
-    # Set up strategy and engine
+
     strategy = CVDBBPullbackStrategy()
     engine = VectorBTEngine(
         initial_cash=1000,
         fee_pct=0.05,
         frequency="1h"
     )
-    
-    # Load data
+
     runner = BacktestRunner(
         strategy=strategy,
         query_service=QuestDBMarketDataQuery(),
@@ -196,25 +185,24 @@ def example_blocked_timeseries_cv():
         fee_pct=0.05,
         risk_pct=1.0
     )
-    
+
     data = runner.load_training_data()
-    
-    # Define parameter combinations
+
     param_combinations = [
-        {"bbands_length": 40, "bbands_stddev": 2.0, "cvd_length": 50, "atr_length": 14, "sl_coef": 2.5, "tpsl_ratio": 2.0},
-        {"bbands_length": 60, "bbands_stddev": 2.5, "cvd_length": 40, "atr_length": 10, "sl_coef": 2.0, "tpsl_ratio": 2.5},
+        {"bbands_length": 40, "bbands_stddev": 2.0, "cvd_length": 50,
+            "atr_length": 14, "sl_coef": 2.5, "tpsl_ratio": 2.0},
+        {"bbands_length": 60, "bbands_stddev": 2.5, "cvd_length": 40,
+            "atr_length": 10, "sl_coef": 2.0, "tpsl_ratio": 2.5},
     ]
-    
-    # Set up cross-validator with blocked approach
+
     cv = TimeSeriesCrossValidator(
         strategy=strategy,
         engine=engine,
         validation_method=ValidationMethod.BLOCKED_TIMESERIES,
-        n_splits=5,  # Divide data into 5 blocks
-        purge_days=2  # 2-day purge between blocks
+        n_splits=5,
+        purge_days=2
     )
-    
-    # Run cross-validation
+
     results = cv.cross_validate(
         data=data,
         param_combinations=param_combinations,
@@ -222,7 +210,7 @@ def example_blocked_timeseries_cv():
         save_results=True,
         config_name="blocked_timeseries_cv_example"
     )
-    
+
     return results
 
 
@@ -231,16 +219,14 @@ def compare_cv_methods():
     print("\n" + "=" * 80)
     print("EXAMPLE 4: COMPARING CROSS-VALIDATION METHODS")
     print("=" * 80)
-    
-    # Set up strategy and engine
+
     strategy = CVDBBPullbackStrategy()
     engine = VectorBTEngine(
         initial_cash=1000,
         fee_pct=0.05,
         frequency="1h"
     )
-    
-    # Load data
+
     runner = BacktestRunner(
         strategy=strategy,
         query_service=QuestDBMarketDataQuery(),
@@ -252,26 +238,25 @@ def compare_cv_methods():
         fee_pct=0.05,
         risk_pct=1.0
     )
-    
+
     data = runner.load_training_data()
-    
-    # Define same parameter combination for fair comparison
+
     param_combinations = [
-        {"bbands_length": 50, "bbands_stddev": 2.5, "cvd_length": 50, "atr_length": 14, "sl_coef": 2.5, "tpsl_ratio": 2.5},
+        {"bbands_length": 50, "bbands_stddev": 2.5, "cvd_length": 50,
+            "atr_length": 14, "sl_coef": 2.5, "tpsl_ratio": 2.5},
     ]
-    
-    # Test all three methods
+
     methods_to_test = [
         ("rolling_window", ValidationMethod.ROLLING_WINDOW),
         ("expanding_window", ValidationMethod.EXPANDING_WINDOW),
         ("blocked_timeseries", ValidationMethod.BLOCKED_TIMESERIES)
     ]
-    
+
     comparison_results = {}
-    
+
     for method_name, method in methods_to_test:
         print(f"\nTesting {method_name.upper()} method...")
-        
+
         cv = TimeSeriesCrossValidator(
             strategy=strategy,
             engine=engine,
@@ -282,7 +267,7 @@ def compare_cv_methods():
             initial_train_months=3,
             purge_days=1
         )
-        
+
         results = cv.cross_validate(
             data=data,
             param_combinations=param_combinations,
@@ -290,7 +275,7 @@ def compare_cv_methods():
             save_results=True,
             config_name=f"comparison_{method_name}"
         )
-        
+
         comparison_results[method_name] = {
             'cv_mean': results.cv_mean,
             'cv_std': results.cv_std,
@@ -299,14 +284,13 @@ def compare_cv_methods():
             'p_value': results.statistical_significance.get('p_value', np.nan),
             'n_splits': results.n_splits
         }
-    
-    # Print comparison
+
     print(f"\n{'='*80}")
     print("CROSS-VALIDATION METHODS COMPARISON")
     print(f"{'='*80}")
     print(f"{'Method':<20} {'CV Score':<15} {'Std Dev':<10} {'95% CI':<25} {'Significant':<12} {'P-Value':<10}")
     print("-" * 100)
-    
+
     for method_name, metrics in comparison_results.items():
         ci_str = f"[{metrics['confidence_interval'][0]:.3f}, {metrics['confidence_interval'][1]:.3f}]"
         print(f"{method_name:<20} "
@@ -315,7 +299,7 @@ def compare_cv_methods():
               f"{ci_str:<25} "
               f"{str(metrics['is_significant']):<12} "
               f"{metrics['p_value']:<10.3f}")
-    
+
     print(f"\nInterpretation:")
     print(f"- Lower std dev indicates more stable performance across folds")
     print(f"- Narrow confidence intervals suggest reliable estimates")
@@ -323,7 +307,7 @@ def compare_cv_methods():
     print(f"- Rolling window: Tests adaptability to recent market conditions")
     print(f"- Expanding window: Tests performance with increasing data")
     print(f"- Blocked series: Tests performance across different time periods")
-    
+
     return comparison_results
 
 
@@ -332,16 +316,14 @@ def example_parameter_sensitivity():
     print("\n" + "=" * 80)
     print("EXAMPLE 5: PARAMETER SENSITIVITY ANALYSIS")
     print("=" * 80)
-    
-    # Set up strategy and engine
+
     strategy = CVDBBPullbackStrategy()
     engine = VectorBTEngine(
         initial_cash=1000,
         fee_pct=0.05,
         frequency="1h"
     )
-    
-    # Load data
+
     runner = BacktestRunner(
         strategy=strategy,
         query_service=QuestDBMarketDataQuery(),
@@ -353,10 +335,9 @@ def example_parameter_sensitivity():
         fee_pct=0.05,
         risk_pct=1.0
     )
-    
+
     data = runner.load_training_data()
-    
-    # Test sensitivity around a base parameter set
+
     base_params = {
         "bbands_length": 50,
         "bbands_stddev": 2.5,
@@ -365,26 +346,23 @@ def example_parameter_sensitivity():
         "sl_coef": 2.5,
         "tpsl_ratio": 2.5
     }
-    
+
     # Create parameter variations (±20% around base values)
     sensitivity_params = []
-    
-    # Test each parameter individually
+
     for param_name, base_value in base_params.items():
         if isinstance(base_value, (int, float)):
-            # Create variations
             variations = [base_value * 0.8, base_value, base_value * 1.2]
-            
+
             for variation in variations:
                 params = base_params.copy()
                 if isinstance(base_value, int):
                     params[param_name] = int(round(variation))
                 else:
                     params[param_name] = round(variation, 1)
-                
+
                 sensitivity_params.append(params)
-    
-    # Remove duplicates
+
     unique_params = []
     seen = set()
     for params in sensitivity_params:
@@ -392,20 +370,20 @@ def example_parameter_sensitivity():
         if param_tuple not in seen:
             seen.add(param_tuple)
             unique_params.append(params)
-    
-    print(f"Testing {len(unique_params)} parameter combinations for sensitivity analysis...")
-    
-    # Run cross-validation with rolling window
+
+    print(
+        f"Testing {len(unique_params)} parameter combinations for sensitivity analysis...")
+
     cv = TimeSeriesCrossValidator(
         strategy=strategy,
         engine=engine,
         validation_method=ValidationMethod.ROLLING_WINDOW,
-        n_splits=3,  # Fewer splits for faster execution
+        n_splits=3,
         train_size_months=4,
         test_size_months=1,
         purge_days=1
     )
-    
+
     results = cv.cross_validate(
         data=data,
         param_combinations=unique_params,
@@ -413,14 +391,13 @@ def example_parameter_sensitivity():
         save_results=True,
         config_name="parameter_sensitivity"
     )
-    
-    # Analyze sensitivity
+
     print(f"\nParameter Sensitivity Analysis:")
-    print(f"Base parameter set CV score: {results.cv_mean:.4f} ± {results.cv_std:.4f}")
+    print(
+        f"Base parameter set CV score: {results.cv_mean:.4f} ± {results.cv_std:.4f}")
     print(f"Best parameter set found: {results.best_parameters}")
     print(f"Best CV score: {results.best_cv_score:.4f}")
-    
-    # Calculate parameter impact (simplified analysis)
+
     param_impacts = {}
     for param_name in base_params.keys():
         param_scores = []
@@ -430,20 +407,22 @@ def example_parameter_sensitivity():
                     'value': result.parameters[param_name],
                     'score': result.test_metrics.get('sharpe_ratio', np.nan)
                 })
-        
+
         if param_scores:
-            scores = [s['score'] for s in param_scores if not np.isnan(s['score'])]
+            scores = [s['score']
+                      for s in param_scores if not np.isnan(s['score'])]
             if scores:
                 param_impacts[param_name] = {
                     'mean_score': np.mean(scores),
                     'std_score': np.std(scores),
                     'range': np.max(scores) - np.min(scores)
                 }
-    
+
     print(f"\nParameter Impact Summary:")
     for param, impact in param_impacts.items():
-        print(f"  {param}: Score range = {impact['range']:.4f}, Std = {impact['std_score']:.4f}")
-    
+        print(
+            f"  {param}: Score range = {impact['range']:.4f}, Std = {impact['std_score']:.4f}")
+
     return results
 
 
@@ -452,26 +431,24 @@ def example_robust_validation_workflow():
     print("\n" + "=" * 80)
     print("EXAMPLE 6: COMPLETE ROBUST VALIDATION WORKFLOW")
     print("=" * 80)
-    
+
     # This example demonstrates a complete validation workflow that you might
     # use in production for validating a trading strategy
-    
+
     print("This workflow includes:")
     print("1. Initial parameter screening with blocked CV")
     print("2. Refined testing with rolling window CV")
     print("3. Final validation with expanding window CV")
     print("4. Statistical significance testing")
     print("5. Robustness assessment")
-    
-    # Set up strategy and engine
+
     strategy = CVDBBPullbackStrategy()
     engine = VectorBTEngine(
         initial_cash=1000,
         fee_pct=0.05,
         frequency="1h"
     )
-    
-    # Load data
+
     runner = BacktestRunner(
         strategy=strategy,
         query_service=QuestDBMarketDataQuery(),
@@ -483,13 +460,13 @@ def example_robust_validation_workflow():
         fee_pct=0.05,
         risk_pct=1.0
     )
-    
+
     data = runner.load_training_data()
-    
+
     # Step 1: Initial screening with broader parameter set
     print("\nStep 1: Initial Parameter Screening")
     print("-" * 40)
-    
+
     broad_param_ranges = {
         "bbands_length": [30, 40, 50, 60, 70],
         "bbands_stddev": [2.0, 2.5, 3.0],
@@ -498,11 +475,10 @@ def example_robust_validation_workflow():
         "sl_coef": [2.0, 2.5],
         "tpsl_ratio": [2.0, 2.5, 3.0]
     }
-    
+
     param_selector = ParametersSelection(broad_param_ranges)
     initial_params = param_selector.get_random_search_params(n_iter=12)
-    
-    # Use blocked CV for initial screening
+
     cv1 = TimeSeriesCrossValidator(
         strategy=strategy,
         engine=engine,
@@ -510,7 +486,7 @@ def example_robust_validation_workflow():
         n_splits=4,
         purge_days=1
     )
-    
+
     initial_results = cv1.cross_validate(
         data=data,
         param_combinations=initial_params,
@@ -518,15 +494,15 @@ def example_robust_validation_workflow():
         save_results=True,
         config_name="workflow_step1_screening"
     )
-    
+
     # Step 2: Select top candidates and test with rolling window
     print("\nStep 2: Refined Testing of Top Candidates")
     print("-" * 40)
-    
+
     # For demonstration, use the best parameter set found
     # In practice, you might select top 3-5 candidates
     top_candidates = [initial_results.best_parameters]
-    
+
     cv2 = TimeSeriesCrossValidator(
         strategy=strategy,
         engine=engine,
@@ -536,7 +512,7 @@ def example_robust_validation_workflow():
         test_size_months=1,
         purge_days=1
     )
-    
+
     refined_results = cv2.cross_validate(
         data=data,
         param_combinations=top_candidates,
@@ -544,11 +520,11 @@ def example_robust_validation_workflow():
         save_results=True,
         config_name="workflow_step2_refined"
     )
-    
+
     # Step 3: Final validation with expanding window
     print("\nStep 3: Final Validation")
     print("-" * 40)
-    
+
     cv3 = TimeSeriesCrossValidator(
         strategy=strategy,
         engine=engine,
@@ -558,7 +534,7 @@ def example_robust_validation_workflow():
         test_size_months=1,
         purge_days=1
     )
-    
+
     final_results = cv3.cross_validate(
         data=data,
         param_combinations=[refined_results.best_parameters],
@@ -566,42 +542,50 @@ def example_robust_validation_workflow():
         save_results=True,
         config_name="workflow_step3_final"
     )
-    
+
     # Step 4: Summary and recommendations
     print("\nStep 4: Validation Summary and Recommendations")
     print("-" * 40)
-    
+
     print(f"Initial screening (Blocked CV):")
-    print(f"  Best CV score: {initial_results.cv_mean:.4f} ± {initial_results.cv_std:.4f}")
-    print(f"  Significant: {initial_results.statistical_significance.get('is_significant', 'N/A')}")
-    
+    print(
+        f"  Best CV score: {initial_results.cv_mean:.4f} ± {initial_results.cv_std:.4f}")
+    print(
+        f"  Significant: {initial_results.statistical_significance.get('is_significant', 'N/A')}")
+
     print(f"\nRefined testing (Rolling Window CV):")
-    print(f"  Best CV score: {refined_results.cv_mean:.4f} ± {refined_results.cv_std:.4f}")
-    print(f"  Significant: {refined_results.statistical_significance.get('is_significant', 'N/A')}")
-    
+    print(
+        f"  Best CV score: {refined_results.cv_mean:.4f} ± {refined_results.cv_std:.4f}")
+    print(
+        f"  Significant: {refined_results.statistical_significance.get('is_significant', 'N/A')}")
+
     print(f"\nFinal validation (Expanding Window CV):")
-    print(f"  Best CV score: {final_results.cv_mean:.4f} ± {final_results.cv_std:.4f}")
-    print(f"  Significant: {final_results.statistical_significance.get('is_significant', 'N/A')}")
-    
+    print(
+        f"  Best CV score: {final_results.cv_mean:.4f} ± {final_results.cv_std:.4f}")
+    print(
+        f"  Significant: {final_results.statistical_significance.get('is_significant', 'N/A')}")
+
     print(f"\nFinal recommended parameters:")
     for param, value in final_results.best_parameters.items():
         print(f"  {param}: {value}")
-    
+
     # Robustness assessment
-    cv_scores = [initial_results.cv_mean, refined_results.cv_mean, final_results.cv_mean]
-    cv_consistency = np.std(cv_scores) / np.mean(cv_scores) if np.mean(cv_scores) != 0 else np.inf
-    
+    cv_scores = [initial_results.cv_mean,
+                 refined_results.cv_mean, final_results.cv_mean]
+    cv_consistency = np.std(
+        cv_scores) / np.mean(cv_scores) if np.mean(cv_scores) != 0 else np.inf
+
     print(f"\nRobustness Assessment:")
     print(f"  CV score consistency (CV): {cv_consistency:.3f}")
     print(f"  {'ROBUST' if cv_consistency < 0.3 else 'NEEDS REVIEW' if cv_consistency < 0.5 else 'NOT ROBUST'}")
-    
+
     if cv_consistency < 0.3:
         print("  ✓ Strategy shows consistent performance across validation methods")
     elif cv_consistency < 0.5:
         print("  ! Strategy shows moderate consistency - consider additional testing")
     else:
         print("  ✗ Strategy shows poor consistency - not recommended for deployment")
-    
+
     return {
         'initial': initial_results,
         'refined': refined_results,
@@ -615,38 +599,38 @@ if __name__ == "__main__":
     Run cross-validation examples.
     Uncomment the examples you want to run.
     """
-    
+
     print("Time-Series Cross-Validation Examples")
     print("=" * 80)
     print("These examples demonstrate robust cross-validation methods")
     print("specifically designed for time-series financial data.")
     print()
-    
+
     try:
         # Example 1: Rolling Window CV
         print("🔄 Running Rolling Window Cross-Validation Example...")
         example_rolling_window_cv()
-        
+
         # Example 2: Expanding Window CV
         print("\n📈 Running Expanding Window Cross-Validation Example...")
         example_expanding_window_cv()
-        
+
         # Example 3: Blocked Time-Series CV
         print("\n🔲 Running Blocked Time-Series Cross-Validation Example...")
         example_blocked_timeseries_cv()
-        
+
         # Example 4: Method Comparison
         print("\n⚖️ Running Cross-Validation Methods Comparison...")
         compare_cv_methods()
-        
+
         # Example 5: Parameter Sensitivity (uncomment to run)
         # print("\n🎯 Running Parameter Sensitivity Analysis...")
         # example_parameter_sensitivity()
-        
+
         # Example 6: Complete Workflow (uncomment to run)
         # print("\n🔬 Running Complete Robust Validation Workflow...")
         # example_robust_validation_workflow()
-        
+
         print(f"\n{'='*80}")
         print("ALL CROSS-VALIDATION EXAMPLES COMPLETED SUCCESSFULLY!")
         print(f"{'='*80}")
@@ -658,7 +642,7 @@ if __name__ == "__main__":
         print("3. Check statistical significance")
         print("4. Consider the method that best fits your use case")
         print("5. Proceed with final out-of-sample testing")
-        
+
     except Exception as e:
         print(f"Error running examples: {e}")
         print("Make sure QuestDB is running and data is available")
