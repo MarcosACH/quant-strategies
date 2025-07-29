@@ -4,6 +4,6 @@ from .backtest_runner import BacktestRunner
 from .vectorbt_engine import VectorBTEngine
 
 __all__ = [
-    'BacktestRunner'
+    'BacktestRunner',
     'VectorBTEngine',
 ]
