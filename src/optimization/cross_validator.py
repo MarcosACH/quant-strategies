@@ -33,9 +33,11 @@ Usage:
     )
 """
 
+from scipy.stats import ttest_1samp
+from scipy import stats
 import numpy as np
 import polars as pl
-from typing import Dict, List, Tuple, Optional, Any, Union
+from typing import Dict, List, Tuple, Any, Union
 from datetime import datetime, timedelta
 from pathlib import Path
 import json
@@ -48,8 +50,6 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Statistical testing
-from scipy import stats
-from scipy.stats import ttest_1samp
 
 
 class ValidationMethod(Enum):
@@ -99,19 +99,20 @@ class CVSummary:
     confidence_interval: Tuple[float, float]
     statistical_significance: Dict[str, Any]
     fold_results: List[CVResult]
-    overall_metrics: Dict[str, Dict[str, float]]  # metric -> {'mean', 'std', 'min', 'max'}
+    # metric -> {'mean', 'std', 'min', 'max'}
+    overall_metrics: Dict[str, Dict[str, float]]
 
 
 class TimeSeriesSplitter(ABC):
     """Abstract base class for time-series splitting strategies."""
-    
-    def __init__(self, 
+
+    def __init__(self,
                  n_splits: int = 5,
                  purge_days: int = 1,
                  embargo_days: int = 0):
         """
         Initialize the splitter.
-        
+
         Args:
             n_splits: Number of cross-validation splits
             purge_days: Days to purge between train and test to prevent leakage
@@ -120,31 +121,31 @@ class TimeSeriesSplitter(ABC):
         self.n_splits = n_splits
         self.purge_days = purge_days
         self.embargo_days = embargo_days
-    
+
     @abstractmethod
     def split(self, data: pl.DataFrame) -> List[CVSplitInfo]:
         """Generate cross-validation splits."""
         pass
-    
-    def _create_split_info(self, 
-                          split_id: int,
-                          data: pl.DataFrame,
-                          train_start: datetime,
-                          train_end: datetime,
-                          test_start: datetime,
-                          test_end: datetime) -> CVSplitInfo:
+
+    def _create_split_info(self,
+                           split_id: int,
+                           data: pl.DataFrame,
+                           train_start: datetime,
+                           train_end: datetime,
+                           test_start: datetime,
+                           test_end: datetime) -> CVSplitInfo:
         """Create a CVSplitInfo object with data filtering."""
-        
+
         train_data = data.filter(
             (pl.col("timestamp") >= train_start) &
             (pl.col("timestamp") <= train_end)
         )
-        
+
         test_data = data.filter(
             (pl.col("timestamp") >= test_start) &
             (pl.col("timestamp") <= test_end)
         )
-        
+
         return CVSplitInfo(
             split_id=split_id,
             train_start=train_start,
@@ -160,7 +161,7 @@ class TimeSeriesSplitter(ABC):
 
 class RollingWindowSplitter(TimeSeriesSplitter):
     """Rolling window time-series cross-validation splitter."""
-    
+
     def __init__(self,
                  n_splits: int = 5,
                  train_size_months: int = 6,
@@ -169,7 +170,7 @@ class RollingWindowSplitter(TimeSeriesSplitter):
                  embargo_days: int = 0):
         """
         Initialize rolling window splitter.
-        
+
         Args:
             train_size_months: Size of training window in months
             test_size_months: Size of testing window in months
@@ -177,42 +178,39 @@ class RollingWindowSplitter(TimeSeriesSplitter):
         super().__init__(n_splits, purge_days, embargo_days)
         self.train_size_months = train_size_months
         self.test_size_months = test_size_months
-    
+
     def split(self, data: pl.DataFrame) -> List[CVSplitInfo]:
         """Generate rolling window splits."""
         if "timestamp" not in data.columns:
             raise ValueError("Data must contain 'timestamp' column")
-        
+
         data_start = data["timestamp"].min()
         data_end = data["timestamp"].max()
-        
+
         train_delta = timedelta(days=self.train_size_months * 30)
         test_delta = timedelta(days=self.test_size_months * 30)
         purge_delta = timedelta(days=self.purge_days)
         embargo_delta = timedelta(days=self.embargo_days)
-        
-        # Calculate step size to get approximately n_splits
+
         total_period = data_end - data_start
-        available_period = total_period - train_delta - test_delta - purge_delta - embargo_delta
-        step_size = available_period / (self.n_splits - 1) if self.n_splits > 1 else timedelta(0)
-        
+        available_period = total_period - train_delta - \
+            test_delta - purge_delta - embargo_delta
+        step_size = available_period / \
+            (self.n_splits - 1) if self.n_splits > 1 else timedelta(0)
+
         splits = []
         for i in range(self.n_splits):
-            # Rolling window start
             window_start = data_start + (step_size * i)
-            
-            # Training period
+
             train_start = window_start
             train_end = train_start + train_delta
-            
-            # Test period (after purge)
+
             test_start = train_end + purge_delta
             test_end = test_start + test_delta
-            
-            # Check if we have enough data for this split
+
             if test_end > data_end:
                 break
-                
+
             split_info = self._create_split_info(
                 split_id=i,
                 data=data,
@@ -221,17 +219,16 @@ class RollingWindowSplitter(TimeSeriesSplitter):
                 test_start=test_start,
                 test_end=test_end
             )
-            
-            # Only include splits with sufficient data
+
             if split_info.train_samples > 100 and split_info.test_samples > 50:
                 splits.append(split_info)
-        
+
         return splits
 
 
 class ExpandingWindowSplitter(TimeSeriesSplitter):
     """Expanding window time-series cross-validation splitter."""
-    
+
     def __init__(self,
                  n_splits: int = 5,
                  initial_train_months: int = 6,
@@ -240,7 +237,7 @@ class ExpandingWindowSplitter(TimeSeriesSplitter):
                  embargo_days: int = 0):
         """
         Initialize expanding window splitter.
-        
+
         Args:
             initial_train_months: Initial training window size in months
             test_size_months: Size of testing window in months
@@ -248,37 +245,35 @@ class ExpandingWindowSplitter(TimeSeriesSplitter):
         super().__init__(n_splits, purge_days, embargo_days)
         self.initial_train_months = initial_train_months
         self.test_size_months = test_size_months
-    
+
     def split(self, data: pl.DataFrame) -> List[CVSplitInfo]:
         """Generate expanding window splits."""
         if "timestamp" not in data.columns:
             raise ValueError("Data must contain 'timestamp' column")
-        
+
         data_start = data["timestamp"].min()
         data_end = data["timestamp"].max()
-        
+
         initial_train_delta = timedelta(days=self.initial_train_months * 30)
         test_delta = timedelta(days=self.test_size_months * 30)
         purge_delta = timedelta(days=self.purge_days)
-        
-        # Calculate step size for test windows
-        remaining_period = data_end - data_start - initial_train_delta - test_delta - purge_delta
-        step_size = remaining_period / (self.n_splits - 1) if self.n_splits > 1 else timedelta(0)
-        
+
+        remaining_period = data_end - data_start - \
+            initial_train_delta - test_delta - purge_delta
+        step_size = remaining_period / \
+            (self.n_splits - 1) if self.n_splits > 1 else timedelta(0)
+
         splits = []
         for i in range(self.n_splits):
-            # Training period (expanding)
             train_start = data_start
             train_end = data_start + initial_train_delta + (step_size * i)
-            
-            # Test period (after purge)
+
             test_start = train_end + purge_delta
             test_end = test_start + test_delta
-            
-            # Check if we have enough data for this split
+
             if test_end > data_end:
                 break
-                
+
             split_info = self._create_split_info(
                 split_id=i,
                 data=data,
@@ -287,51 +282,48 @@ class ExpandingWindowSplitter(TimeSeriesSplitter):
                 test_start=test_start,
                 test_end=test_end
             )
-            
-            # Only include splits with sufficient data
+
             if split_info.train_samples > 100 and split_info.test_samples > 50:
                 splits.append(split_info)
-        
+
         return splits
 
 
 class BlockedTimeSeriesSplitter(TimeSeriesSplitter):
     """Blocked time-series cross-validation splitter."""
-    
+
     def __init__(self,
                  n_splits: int = 5,
                  purge_days: int = 1,
                  embargo_days: int = 0):
         """
         Initialize blocked time-series splitter.
-        
+
         This method divides the entire dataset into n_splits blocks,
         using each block as test set and preceding blocks as training.
         """
         super().__init__(n_splits, purge_days, embargo_days)
-    
+
     def split(self, data: pl.DataFrame) -> List[CVSplitInfo]:
         """Generate blocked time-series splits."""
         if "timestamp" not in data.columns:
             raise ValueError("Data must contain 'timestamp' column")
-        
+
         data_start = data["timestamp"].min()
         data_end = data["timestamp"].max()
-        
+
         total_duration = data_end - data_start
         block_duration = total_duration / self.n_splits
         purge_delta = timedelta(days=self.purge_days)
-        
+
         splits = []
         for i in range(1, self.n_splits):  # Start from 1 to have training data
-            # Training period (all blocks before current)
             train_start = data_start
             train_end = data_start + (block_duration * i) - purge_delta
-            
-            # Test period (current block)
+
             test_start = data_start + (block_duration * i)
             test_end = data_start + (block_duration * (i + 1))
-            
+
             split_info = self._create_split_info(
                 split_id=i - 1,
                 data=data,
@@ -340,26 +332,26 @@ class BlockedTimeSeriesSplitter(TimeSeriesSplitter):
                 test_start=test_start,
                 test_end=test_end
             )
-            
-            # Only include splits with sufficient data
+
             if split_info.train_samples > 100 and split_info.test_samples > 50:
                 splits.append(split_info)
-        
+
         return splits
 
 
 class TimeSeriesCrossValidator:
     """
     Time-Series Cross-Validation for trading strategies.
-    
+
     This class implements various time-series cross-validation methods
     specifically designed for financial data and trading strategies.
     """
-    
+
     def __init__(self,
                  strategy,
                  engine,
-                 validation_method: Union[str, ValidationMethod] = ValidationMethod.ROLLING_WINDOW,
+                 validation_method: Union[str,
+                                          ValidationMethod] = ValidationMethod.ROLLING_WINDOW,
                  n_splits: int = 5,
                  train_size_months: int = 6,
                  test_size_months: int = 2,
@@ -372,7 +364,7 @@ class TimeSeriesCrossValidator:
                  random_state: int = 42):
         """
         Initialize the time-series cross-validator.
-        
+
         Args:
             strategy: Trading strategy instance
             engine: Backtesting engine instance
@@ -390,11 +382,11 @@ class TimeSeriesCrossValidator:
         """
         self.strategy = strategy
         self.engine = engine
-        
+
         if isinstance(validation_method, str):
             validation_method = ValidationMethod(validation_method)
         self.validation_method = validation_method
-        
+
         self.n_splits = n_splits
         self.train_size_months = train_size_months
         self.test_size_months = test_size_months
@@ -405,14 +397,12 @@ class TimeSeriesCrossValidator:
         self.min_test_samples = min_test_samples
         self.significance_level = significance_level
         self.random_state = random_state
-        
-        # Initialize splitter based on method
+
         self.splitter = self._create_splitter()
-        
-        # Results storage
+
         self.results_dir = Path("data/backtest_results/cross_validation")
         self.results_dir.mkdir(parents=True, exist_ok=True)
-    
+
     def _create_splitter(self) -> TimeSeriesSplitter:
         """Create the appropriate splitter based on validation method."""
         if self.validation_method == ValidationMethod.ROLLING_WINDOW:
@@ -438,18 +428,19 @@ class TimeSeriesCrossValidator:
                 embargo_days=self.embargo_days
             )
         else:
-            raise ValueError(f"Unsupported validation method: {self.validation_method}")
-    
+            raise ValueError(
+                f"Unsupported validation method: {self.validation_method}")
+
     def cross_validate(self,
-                      data: pl.DataFrame,
-                      param_combinations: List[Dict[str, Any]],
-                      optimization_metric: str = "sharpe_ratio",
-                      parallel: bool = True,
-                      save_results: bool = True,
-                      config_name: str = "cv_results") -> CVSummary:
+                       data: pl.DataFrame,
+                       param_combinations: List[Dict[str, Any]],
+                       optimization_metric: str = "sharpe_ratio",
+                       parallel: bool = True,
+                       save_results: bool = True,
+                       config_name: str = "cv_results") -> CVSummary:
         """
         Perform cross-validation on parameter combinations.
-        
+
         Args:
             data: Market data DataFrame
             param_combinations: List of parameter combinations to test
@@ -457,7 +448,7 @@ class TimeSeriesCrossValidator:
             parallel: Whether to use parallel processing (future enhancement)
             save_results: Whether to save results to disk
             config_name: Configuration name for saved results
-            
+
         Returns:
             CVSummary object with cross-validation results
         """
@@ -468,87 +459,84 @@ class TimeSeriesCrossValidator:
         print(f"Splits: {self.n_splits}")
         print(f"Parameters to test: {len(param_combinations):,}")
         print(f"Optimization metric: {optimization_metric}")
-        print(f"Data period: {data['timestamp'].min()} to {data['timestamp'].max()}")
+        print(
+            f"Data period: {data['timestamp'].min()} to {data['timestamp'].max()}")
         print(f"Data points: {len(data):,}")
-        
+
         start_time = time.time()
-        
-        # Generate splits
+
         splits = self.splitter.split(data)
         print(f"\nGenerated {len(splits)} valid cross-validation splits")
-        
-        # Print split information
+
         self._print_split_info(splits)
-        
+
         if len(splits) == 0:
-            raise ValueError("No valid splits generated. Check data size and parameters.")
-        
-        # Run cross-validation
+            raise ValueError(
+                "No valid splits generated. Check data size and parameters.")
+
         all_fold_results = []
-        
+
         for param_idx, params in enumerate(param_combinations):
             print(f"\n{'-'*50}")
-            print(f"Testing parameter combination {param_idx + 1}/{len(param_combinations)}")
+            print(
+                f"Testing parameter combination {param_idx + 1}/{len(param_combinations)}")
             print(f"Parameters: {params}")
-            
+
             fold_results = []
-            
+
             for split in splits:
                 print(f"\n  Fold {split.split_id + 1}/{len(splits)} "
                       f"(Train: {split.train_samples:,}, Test: {split.test_samples:,})")
-                
+
                 fold_result = self._run_single_fold(
                     split=split,
                     parameters=params,
                     optimization_metric=optimization_metric
                 )
-                
+
                 fold_results.append(fold_result)
-                
-                # Print fold results
-                print(f"    Train {optimization_metric}: {fold_result.train_metrics[optimization_metric]:.4f}")
-                print(f"    Test {optimization_metric}: {fold_result.test_metrics[optimization_metric]:.4f}")
-            
+
+                print(
+                    f"    Train {optimization_metric}: {fold_result.train_metrics[optimization_metric]:.4f}")
+                print(
+                    f"    Test {optimization_metric}: {fold_result.test_metrics[optimization_metric]:.4f}")
+
             all_fold_results.extend(fold_results)
-            
-            # Calculate CV score for this parameter combination
-            cv_scores = [result.test_metrics[optimization_metric] for result in fold_results]
+
+            cv_scores = [result.test_metrics[optimization_metric]
+                         for result in fold_results]
             cv_mean = np.mean(cv_scores)
             cv_std = np.std(cv_scores)
-            
+
             print(f"  CV Score: {cv_mean:.4f} ± {cv_std:.4f}")
-        
-        # Calculate summary statistics
+
         summary = self._calculate_cv_summary(
             all_fold_results=all_fold_results,
             optimization_metric=optimization_metric,
             param_combinations=param_combinations,
             n_splits=len(splits)
         )
-        
-        # Print summary
+
         self._print_cv_summary(summary, optimization_metric)
-        
-        # Save results
+
         if save_results:
             self._save_cv_results(summary, config_name)
-        
+
         end_time = time.time()
         duration = end_time - start_time
         print(f"\nCross-validation completed in {duration:.2f} seconds")
         print(f"Total folds executed: {len(all_fold_results)}")
-        
+
         return summary
-    
+
     def _run_single_fold(self,
-                        split: CVSplitInfo,
-                        parameters: Dict[str, Any],
-                        optimization_metric: str) -> CVResult:
+                         split: CVSplitInfo,
+                         parameters: Dict[str, Any],
+                         optimization_metric: str) -> CVResult:
         """Run a single cross-validation fold."""
-        
+
         fold_start_time = time.time()
-        
-        # Train on training data
+
         train_results = self.engine.simulate_portfolios(
             strategy=self.strategy,
             data=split.train_data,
@@ -561,12 +549,11 @@ class TimeSeriesCrossValidator:
             save_results=False,
             indicator_batch_size=1
         )
-        
+
         train_duration = time.time() - fold_start_time
-        
-        # Test on test data
+
         test_start_time = time.time()
-        
+
         test_results = self.engine.simulate_portfolios(
             strategy=self.strategy,
             data=split.test_data,
@@ -579,13 +566,14 @@ class TimeSeriesCrossValidator:
             save_results=False,
             indicator_batch_size=1
         )
-        
+
         test_duration = time.time() - test_start_time
-        
-        # Extract metrics
-        train_metrics = train_results.to_dicts()[0] if len(train_results) > 0 else {}
-        test_metrics = test_results.to_dicts()[0] if len(test_results) > 0 else {}
-        
+
+        train_metrics = train_results.to_dicts(
+        )[0] if len(train_results) > 0 else {}
+        test_metrics = test_results.to_dicts(
+        )[0] if len(test_results) > 0 else {}
+
         return CVResult(
             split_id=split.split_id,
             parameters=parameters,
@@ -595,61 +583,61 @@ class TimeSeriesCrossValidator:
             test_duration=test_duration,
             split_info=split
         )
-    
+
     def _calculate_cv_summary(self,
-                             all_fold_results: List[CVResult],
-                             optimization_metric: str,
-                             param_combinations: List[Dict[str, Any]],
-                             n_splits: int) -> CVSummary:
+                              all_fold_results: List[CVResult],
+                              optimization_metric: str,
+                              param_combinations: List[Dict[str, Any]],
+                              n_splits: int) -> CVSummary:
         """Calculate cross-validation summary statistics."""
-        
-        # Group results by parameter combination
+
         param_results = {}
         for result in all_fold_results:
             param_key = str(sorted(result.parameters.items()))
             if param_key not in param_results:
                 param_results[param_key] = []
             param_results[param_key].append(result)
-        
-        # Find best parameter combination
-        best_cv_score = -np.inf if optimization_metric in ["sharpe_ratio", "total_return_pct", "win_rate_pct"] else np.inf
+
+        best_cv_score = -np.inf if optimization_metric in [
+            "sharpe_ratio", "total_return_pct", "win_rate_pct"] else np.inf
         best_parameters = None
         best_results = None
-        
+
         param_cv_scores = {}
-        
+
         for param_key, results in param_results.items():
-            cv_scores = [r.test_metrics.get(optimization_metric, np.nan) for r in results]
+            cv_scores = [r.test_metrics.get(
+                optimization_metric, np.nan) for r in results]
             cv_scores = [score for score in cv_scores if not np.isnan(score)]
-            
+
             if len(cv_scores) == 0:
                 continue
-                
+
             cv_mean = np.mean(cv_scores)
             param_cv_scores[param_key] = {
                 'mean': cv_mean,
                 'scores': cv_scores,
                 'results': results
             }
-            
-            # Check if this is the best combination
+
             is_better = (optimization_metric in ["sharpe_ratio", "total_return_pct", "win_rate_pct"] and cv_mean > best_cv_score) or \
-                       (optimization_metric not in ["sharpe_ratio", "total_return_pct", "win_rate_pct"] and cv_mean < best_cv_score)
-            
+                (optimization_metric not in [
+                 "sharpe_ratio", "total_return_pct", "win_rate_pct"] and cv_mean < best_cv_score)
+
             if is_better:
                 best_cv_score = cv_mean
                 best_parameters = results[0].parameters
                 best_results = results
-        
-        # Calculate statistics for best parameters
+
         if best_results:
-            best_cv_scores = [r.test_metrics.get(optimization_metric, np.nan) for r in best_results]
-            best_cv_scores = [score for score in best_cv_scores if not np.isnan(score)]
-            
+            best_cv_scores = [r.test_metrics.get(
+                optimization_metric, np.nan) for r in best_results]
+            best_cv_scores = [
+                score for score in best_cv_scores if not np.isnan(score)]
+
             cv_mean = np.mean(best_cv_scores)
             cv_std = np.std(best_cv_scores)
-            
-            # Calculate confidence interval
+
             if len(best_cv_scores) > 1:
                 confidence_interval = stats.t.interval(
                     1 - self.significance_level,
@@ -659,15 +647,14 @@ class TimeSeriesCrossValidator:
                 )
             else:
                 confidence_interval = (cv_mean, cv_mean)
-            
-            # Statistical significance test (against zero)
+
             if len(best_cv_scores) > 1:
                 t_stat, p_value = ttest_1samp(best_cv_scores, 0)
                 is_significant = p_value < self.significance_level
             else:
                 t_stat, p_value = np.nan, np.nan
                 is_significant = False
-            
+
             statistical_significance = {
                 't_statistic': t_stat,
                 'p_value': p_value,
@@ -680,10 +667,9 @@ class TimeSeriesCrossValidator:
             confidence_interval = (np.nan, np.nan)
             statistical_significance = {}
             best_cv_scores = []
-        
-        # Calculate overall metrics summary
+
         overall_metrics = self._calculate_overall_metrics(all_fold_results)
-        
+
         return CVSummary(
             n_splits=n_splits,
             total_parameters_tested=len(param_combinations),
@@ -697,23 +683,24 @@ class TimeSeriesCrossValidator:
             fold_results=all_fold_results,
             overall_metrics=overall_metrics
         )
-    
+
     def _calculate_overall_metrics(self, all_fold_results: List[CVResult]) -> Dict[str, Dict[str, float]]:
         """Calculate overall metrics across all folds."""
         metrics = {}
-        
-        # Get all available metrics from first result
+
         if not all_fold_results:
             return metrics
-            
+
         sample_metrics = all_fold_results[0].test_metrics.keys()
-        
+
         for metric in sample_metrics:
             values = []
             for result in all_fold_results:
-                if metric in result.test_metrics and not np.isnan(result.test_metrics[metric]):
-                    values.append(result.test_metrics[metric])
-            
+                if metric in result.test_metrics:
+                    metric_value = result.test_metrics[metric]
+                    if isinstance(metric_value, (int, float, np.number)) and not (isinstance(metric_value, float) and np.isnan(metric_value)):
+                        values.append(metric_value)
+
             if values:
                 metrics[metric] = {
                     'mean': np.mean(values),
@@ -723,14 +710,14 @@ class TimeSeriesCrossValidator:
                     'median': np.median(values),
                     'count': len(values)
                 }
-        
+
         return metrics
-    
+
     def _print_split_info(self, splits: List[CVSplitInfo]) -> None:
         """Print information about cross-validation splits."""
         print(f"\n{'Split':<5} {'Train Start':<12} {'Train End':<12} {'Test Start':<12} {'Test End':<12} {'Train Size':<10} {'Test Size':<10}")
         print("-" * 80)
-        
+
         for split in splits:
             print(f"{split.split_id + 1:<5} "
                   f"{split.train_start.strftime('%Y-%m-%d'):<12} "
@@ -739,46 +726,51 @@ class TimeSeriesCrossValidator:
                   f"{split.test_end.strftime('%Y-%m-%d'):<12} "
                   f"{split.train_samples:<10,} "
                   f"{split.test_samples:<10,}")
-    
+
     def _print_cv_summary(self, summary: CVSummary, optimization_metric: str) -> None:
         """Print cross-validation summary."""
         print(f"\n{'='*70}")
         print(f"CROSS-VALIDATION SUMMARY")
         print(f"{'='*70}")
-        
+
         print(f"Total splits: {summary.n_splits}")
-        print(f"Total parameter combinations tested: {summary.total_parameters_tested}")
+        print(
+            f"Total parameter combinations tested: {summary.total_parameters_tested}")
         print(f"Total folds executed: {len(summary.fold_results)}")
-        
+
         if summary.best_parameters:
             print(f"\nBEST PARAMETERS (by {optimization_metric}):")
             for param, value in summary.best_parameters.items():
                 print(f"  {param}: {value}")
-            
+
             print(f"\nCROSS-VALIDATION PERFORMANCE:")
             print(f"  CV Score: {summary.cv_mean:.4f} ± {summary.cv_std:.4f}")
-            print(f"  Confidence Interval (95%): [{summary.confidence_interval[0]:.4f}, {summary.confidence_interval[1]:.4f}]")
-            
+            print(
+                f"  Confidence Interval (95%): [{summary.confidence_interval[0]:.4f}, {summary.confidence_interval[1]:.4f}]")
+
             if summary.statistical_significance:
                 print(f"\nSTATISTICAL SIGNIFICANCE:")
-                print(f"  t-statistic: {summary.statistical_significance['t_statistic']:.4f}")
-                print(f"  p-value: {summary.statistical_significance['p_value']:.4f}")
-                print(f"  Significant: {summary.statistical_significance['is_significant']}")
-            
+                print(
+                    f"  t-statistic: {summary.statistical_significance['t_statistic']:.4f}")
+                print(
+                    f"  p-value: {summary.statistical_significance['p_value']:.4f}")
+                print(
+                    f"  Significant: {summary.statistical_significance['is_significant']}")
+
             print(f"\nOVERALL METRICS ACROSS ALL FOLDS:")
             for metric, stats in summary.overall_metrics.items():
                 print(f"  {metric}:")
                 print(f"    Mean: {stats['mean']:.4f} ± {stats['std']:.4f}")
                 print(f"    Range: [{stats['min']:.4f}, {stats['max']:.4f}]")
                 print(f"    Median: {stats['median']:.4f}")
-    
+
     def _save_cv_results(self, summary: CVSummary, config_name: str) -> None:
         """Save cross-validation results to disk."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Save summary
-        summary_file = self.results_dir / f"{config_name}_{self.validation_method.value}_summary_{timestamp}.json"
-        
+
+        summary_file = self.results_dir / \
+            f"{config_name}_{self.validation_method.value}_summary_{timestamp}.json"
+
         summary_data = {
             'validation_method': self.validation_method.value,
             'n_splits': summary.n_splits,
@@ -798,13 +790,13 @@ class TimeSeriesCrossValidator:
                 'significance_level': self.significance_level
             }
         }
-        
+
         with open(summary_file, 'w') as f:
             json.dump(summary_data, f, indent=2, default=str)
-        
-        # Save detailed results
-        detailed_file = self.results_dir / f"{config_name}_{self.validation_method.value}_detailed_{timestamp}.json"
-        
+
+        detailed_file = self.results_dir / \
+            f"{config_name}_{self.validation_method.value}_detailed_{timestamp}.json"
+
         detailed_data = []
         for result in summary.fold_results:
             detailed_data.append({
@@ -823,10 +815,10 @@ class TimeSeriesCrossValidator:
                     'test_samples': result.split_info.test_samples
                 }
             })
-        
+
         with open(detailed_file, 'w') as f:
             json.dump(detailed_data, f, indent=2, default=str)
-        
+
         print(f"\nResults saved:")
         print(f"  Summary: {summary_file}")
         print(f"  Detailed: {detailed_file}")
@@ -834,7 +826,7 @@ class TimeSeriesCrossValidator:
     def plot_cv_results(self, summary: CVSummary, optimization_metric: str = "sharpe_ratio"):
         """
         Plot cross-validation results (placeholder for future visualization).
-        
+
         This method can be extended to create visualizations of:
         - CV scores across folds
         - Parameter sensitivity
@@ -850,7 +842,6 @@ class TimeSeriesCrossValidator:
         pass
 
 
-# Convenience functions for common use cases
 def rolling_window_cv(strategy, engine, data, param_combinations, **kwargs):
     """Convenience function for rolling window cross-validation."""
     validator = TimeSeriesCrossValidator(
