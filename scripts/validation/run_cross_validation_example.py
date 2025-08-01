@@ -18,8 +18,6 @@ Usage:
 import sys
 from pathlib import Path
 import numpy as np
-import polars as pl
-from datetime import datetime
 
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
@@ -28,9 +26,6 @@ try:
     from src.optimization.cross_validator import (
         TimeSeriesCrossValidator,
         ValidationMethod,
-        rolling_window_cv,
-        expanding_window_cv,
-        blocked_timeseries_cv
     )
     from src.bt_engine.backtest_runner import BacktestRunner
     from src.bt_engine.vectorbt_engine import VectorBTEngine
@@ -68,7 +63,7 @@ def example_rolling_window_cv():
         risk_pct=1.0
     )
 
-    data = runner.load_training_data()
+    data = runner.load_data("train")
 
     param_ranges = {
         "bbands_length": [30, 50, 70],
@@ -129,7 +124,7 @@ def example_expanding_window_cv():
         risk_pct=1.0
     )
 
-    data = runner.load_training_data()
+    data = runner.load_data("train")
 
     param_combinations = [
         {"bbands_length": 30, "bbands_stddev": 2.0, "cvd_length": 40,
@@ -186,7 +181,7 @@ def example_blocked_timeseries_cv():
         risk_pct=1.0
     )
 
-    data = runner.load_training_data()
+    data = runner.load_data("train")
 
     param_combinations = [
         {"bbands_length": 40, "bbands_stddev": 2.0, "cvd_length": 50,
@@ -239,7 +234,7 @@ def compare_cv_methods():
         risk_pct=1.0
     )
 
-    data = runner.load_training_data()
+    data = runner.load_data("train")
 
     param_combinations = [
         {"bbands_length": 50, "bbands_stddev": 2.5, "cvd_length": 50,
@@ -336,7 +331,7 @@ def example_parameter_sensitivity():
         risk_pct=1.0
     )
 
-    data = runner.load_training_data()
+    data = runner.load_data("train")
 
     base_params = {
         "bbands_length": 50,
@@ -461,9 +456,8 @@ def example_robust_validation_workflow():
         risk_pct=1.0
     )
 
-    data = runner.load_training_data()
+    data = runner.load_data("train")
 
-    # Step 1: Initial screening with broader parameter set
     print("\nStep 1: Initial Parameter Screening")
     print("-" * 40)
 
@@ -495,7 +489,6 @@ def example_robust_validation_workflow():
         config_name="workflow_step1_screening"
     )
 
-    # Step 2: Select top candidates and test with rolling window
     print("\nStep 2: Refined Testing of Top Candidates")
     print("-" * 40)
 
@@ -521,7 +514,6 @@ def example_robust_validation_workflow():
         config_name="workflow_step2_refined"
     )
 
-    # Step 3: Final validation with expanding window
     print("\nStep 3: Final Validation")
     print("-" * 40)
 
@@ -543,7 +535,6 @@ def example_robust_validation_workflow():
         config_name="workflow_step3_final"
     )
 
-    # Step 4: Summary and recommendations
     print("\nStep 4: Validation Summary and Recommendations")
     print("-" * 40)
 
@@ -569,7 +560,6 @@ def example_robust_validation_workflow():
     for param, value in final_results.best_parameters.items():
         print(f"  {param}: {value}")
 
-    # Robustness assessment
     cv_scores = [initial_results.cv_mean,
                  refined_results.cv_mean, final_results.cv_mean]
     cv_consistency = np.std(
@@ -608,28 +598,28 @@ if __name__ == "__main__":
 
     try:
         # Example 1: Rolling Window CV
-        print("🔄 Running Rolling Window Cross-Validation Example...")
-        example_rolling_window_cv()
+        # print("Running Rolling Window Cross-Validation Example...")
+        # example_rolling_window_cv()
 
         # Example 2: Expanding Window CV
-        print("\n📈 Running Expanding Window Cross-Validation Example...")
-        example_expanding_window_cv()
+        # print("\nRunning Expanding Window Cross-Validation Example...")
+        # example_expanding_window_cv()
 
         # Example 3: Blocked Time-Series CV
-        print("\n🔲 Running Blocked Time-Series Cross-Validation Example...")
-        example_blocked_timeseries_cv()
+        # print("\nRunning Blocked Time-Series Cross-Validation Example...")
+        # example_blocked_timeseries_cv()
 
         # Example 4: Method Comparison
-        print("\n⚖️ Running Cross-Validation Methods Comparison...")
-        compare_cv_methods()
+        # print("\nRunning Cross-Validation Methods Comparison...")
+        # compare_cv_methods()
 
         # Example 5: Parameter Sensitivity (uncomment to run)
-        # print("\n🎯 Running Parameter Sensitivity Analysis...")
+        # print("\nRunning Parameter Sensitivity Analysis...")
         # example_parameter_sensitivity()
 
         # Example 6: Complete Workflow (uncomment to run)
-        # print("\n🔬 Running Complete Robust Validation Workflow...")
-        # example_robust_validation_workflow()
+        print("\nRunning Complete Robust Validation Workflow...")
+        example_robust_validation_workflow()
 
         print(f"\n{'='*80}")
         print("ALL CROSS-VALIDATION EXAMPLES COMPLETED SUCCESSFULLY!")
