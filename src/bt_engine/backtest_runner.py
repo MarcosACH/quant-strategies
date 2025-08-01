@@ -31,7 +31,7 @@ import numpy as np
 from pathlib import Path
 import time
 import json
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Literal
 from datetime import datetime, timezone
 from skopt import gp_minimize
 from skopt.utils import use_named_args
@@ -155,14 +155,17 @@ class BacktestRunner:
 
         return f"{days} days {hours:02d}:{minutes:02d}:{seconds:02d}"
 
-    def load_training_data(self) -> pl.DataFrame:
+    def load_data(self, data_type: Literal['train', 'validation', 'test']) -> pl.DataFrame:
         """
-        Load training data from QuestDB.
+        Load data from QuestDB.
+
+        Args:
+            data_type: The type of data to load ('train', 'validation', 'test').
 
         Returns:
-            Training dataset
+            DataFrame containing the requested dataset
         """
-        print(f"Loading data from QuestDB...")
+        print(f"Loading {data_type} data from QuestDB...")
         print(f"Symbol: {self.symbol}")
         print(
             f"Period: {self.start_date.strftime('%Y-%m-%d')} to {self.end_date.strftime('%Y-%m-%d')}")
@@ -214,8 +217,6 @@ class BacktestRunner:
             print("\nStarting data preparation...")
             prepared_datasets = pipeline.prepare_data(save_to_disk=False)
 
-            print("\nData preparation completed successfully!")
-
             for split_name, dataset in prepared_datasets.items():
                 if len(dataset) > 0:
                     print(f"\n{split_name.upper()} SET:")
@@ -223,13 +224,14 @@ class BacktestRunner:
                     print(
                         f"   Period: {dataset['timestamp'].min()} to {dataset['timestamp'].max()}")
 
-            return prepared_datasets['train']
+            return prepared_datasets[data_type]
 
         except Exception as e:
             print(f"\nError during preparation: {e}")
             sys.exit(1)
 
     def run_backtest(self,
+                     data_type: Literal['train', 'validation', 'test'],
                      param_ranges: Dict[str, List],
                      method: str = "grid",
                      optimization_metric: str = "sharpe_ratio",
@@ -254,7 +256,10 @@ class BacktestRunner:
             raise ValueError(
                 f"n_iter ({n_iter}) cannot be greater than the number of parameter combinations ({np.prod([len(v) for v in param_ranges.values()])})")
 
-        data = self.load_training_data()
+        if data_type not in ['train', 'validation', 'test']:
+            raise ValueError(f"Unknown data type: {data_type}")
+        else:
+            data = self.load_data(data_type)
 
         engine = VectorBTEngine(
             initial_cash=self.initial_cash,
