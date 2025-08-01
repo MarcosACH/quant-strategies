@@ -219,7 +219,7 @@ class CVIntegratedOptimizer:
         start_time = time.time()
 
         print(f"\nLoading data...")
-        data = self.runner.load_training_data()
+        data = self.runner.load_data("train")
         print(f"Data loaded: {len(data):,} records")
 
         print(f"\nGenerating parameter combinations...")
@@ -480,6 +480,7 @@ class CVIntegratedOptimizer:
         # This would use the test split from your data configuration
         # For now, we'll simulate this by using the existing runner
         results = self.runner.run_backtest(
+            "test",
             param_ranges={param: [value]
                           for param, value in best_parameters.items()},
             method="grid",
