@@ -15,27 +15,27 @@ from config.settings import settings
 @dataclass
 class DataSplitConfig:
     """Configuration for data splitting strategy."""
-    train_pct: float = 0.6
-    validation_pct: Optional[float] = 0.2
-    test_pct: Optional[float] = 0.2
+    train_pct: float = 60
+    validation_pct: Optional[float] = 20
+    test_pct: Optional[float] = 20
     purge_days: int = 1  # Days to purge between splits to prevent leakage
 
     def __post_init__(self):
         """Validate split configuration."""
         total_pct = self.train_pct + \
             (self.validation_pct or 0) + (self.test_pct or 0)
-        if abs(total_pct - 1.0) > 0.001:
+        if abs(total_pct - 100.0) > 0.001:
             raise ValueError(
-                f"Split percentages must sum to 1.0, got {total_pct}")
+                f"Split percentages must sum to 100.0, got {total_pct}")
 
-        if self.train_pct <= 0 or self.train_pct >= 1:
-            raise ValueError("Train percentage must be between 0 and 1")
+        if self.train_pct <= 0 or self.train_pct >= 100:
+            raise ValueError("Train percentage must be between 0 and 100")
 
-        if self.validation_pct is not None and (self.validation_pct <= 0 or self.validation_pct >= 1):
-            raise ValueError("Validation percentage must be between 0 and 1")
+        if self.validation_pct is not None and (self.validation_pct <= 0 or self.validation_pct >= 100):
+            raise ValueError("Validation percentage must be between 0 and 100")
 
-        if self.test_pct is not None and (self.test_pct <= 0 or self.test_pct >= 1):
-            raise ValueError("Test percentage must be between 0 and 1")
+        if self.test_pct is not None and (self.test_pct <= 0 or self.test_pct >= 100):
+            raise ValueError("Test percentage must be between 0 and 100")
 
 
 @dataclass
@@ -121,7 +121,7 @@ class DataConfig:
         purge_duration = timedelta(days=self.split_config.purge_days)
 
         train_end = self.start_date + \
-            (total_duration * self.split_config.train_pct)
+            (total_duration * self.split_config.train_pct / 100.0)
 
         splits = {
             "train": (self.start_date, train_end)
@@ -130,7 +130,7 @@ class DataConfig:
         if self.split_config.validation_pct:
             validation_start = train_end + purge_duration
             validation_end = validation_start + \
-                (total_duration * self.split_config.validation_pct)
+                (total_duration * self.split_config.validation_pct / 100.0)
             splits["validation"] = (validation_start, validation_end)
 
             if self.split_config.test_pct:
@@ -273,7 +273,7 @@ Symbol: {self.symbol} ({self.exchange})
 Period: {self.start_date.strftime('%Y-%m-%d')} to {self.end_date.strftime('%Y-%m-%d')}
 Timeframe: {self.timeframe}
 Expected Data Points: {self.get_expected_data_points():,}
-Splits: Train {self.split_config.train_pct:.0%} | Validation {self.split_config.validation_pct or 0:.0%} | Test {self.split_config.test_pct or 0:.0%}
+Splits: Train {self.split_config.train_pct:.0f}% | Validation {self.split_config.validation_pct or 0:.0f}% | Test {self.split_config.test_pct or 0:.0f}%
 Train: {split_dates.get('train', (None, None))[0].strftime('%Y-%m-%d') if split_dates.get('train') else 'N/A'} to {split_dates.get('train', (None, None))[1].strftime('%Y-%m-%d') if split_dates.get('train') else 'N/A'} ({train_duration.days} days)
 Validation: {split_dates.get('validation', (None, None))[0].strftime('%Y-%m-%d') if split_dates.get('validation') else 'N/A'} to {split_dates.get('validation', (None, None))[1].strftime('%Y-%m-%d') if split_dates.get('validation') else 'N/A'} ({validation_duration.days} days)
 Test: {split_dates.get('test', (None, None))[0].strftime('%Y-%m-%d') if split_dates.get('test') else 'N/A'} to {split_dates.get('test', (None, None))[1].strftime('%Y-%m-%d') if split_dates.get('test') else 'N/A'} ({test_duration.days} days)"""

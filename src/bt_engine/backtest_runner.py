@@ -84,9 +84,9 @@ class BacktestRunner:
                  risk_pct: float = 1.0,
                  config_name: str = None,
                  description: str = None,
-                 train_pct: float = 0.6,
-                 validation_pct: float = 0.2,
-                 test_pct: float = 0.2
+                 train_pct: float = 60,
+                 validation_pct: float = 20,
+                 test_pct: float = 20
                  ):
         """
         Initialize the backtest runner.
