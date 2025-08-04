@@ -204,16 +204,7 @@ class BacktestRunner:
         pipeline = DataPreparationPipeline(data_config)
 
         try:
-            print("\nStarting data preparation...")
             prepared_datasets = pipeline.prepare_data(save_to_disk=False)
-
-            for split_name, dataset in prepared_datasets.items():
-                if len(dataset) > 0:
-                    print(f"\n{split_name.upper()} SET:")
-                    print(f"   Records: {len(dataset):,}")
-                    print(
-                        f"   Period: {dataset['timestamp'].min()} to {dataset['timestamp'].max()}")
-
             return prepared_datasets[data_type]
 
         except Exception as e:

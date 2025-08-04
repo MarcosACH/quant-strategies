@@ -79,15 +79,26 @@ class DataPreparationPipeline:
         print("\nStep 4: Splitting data...")
         split_datasets = self._split_data(cleaned_data)
 
-        for split_name, split_data in split_datasets.items():
-            print(
-                f"   • {split_name.capitalize()}: {len(split_data):,} records")
+        for i, (split_name, dataset) in enumerate(split_datasets.items()):
+            percentage = (len(dataset) / sum(len(d)
+                                             for d in split_datasets.values())) * 100
+            if len(dataset) > 0:
+                if i > 0:
+                    print("\n")
+                print(f"   {split_name.upper()} SET:")
+                print(f"      Records: {len(dataset):,} ({percentage:.1f}%)")
+                print(
+                    f"      Period: {dataset['timestamp'].min()} to {dataset['timestamp'].max()}")
+            else:
+                if i > 0:
+                    print("\n")
+                print(f"   {split_name.upper()} SET: No data available")
 
         if save_to_disk:
             print("\nStep 5: Saving prepared datasets...")
             self._save_datasets(split_datasets)
 
-        print("\nStep 6: Generating summary report...")
+        print("\nStep 6: Generating summary report..." if save_to_disk else "\nStep 5: Generating summary report...")
         self._generate_summary_report(split_datasets)
 
         print("\nData preparation completed successfully!")
@@ -172,7 +183,7 @@ class DataPreparationPipeline:
 
     def _generate_summary_report(self, datasets: Dict[str, pl.DataFrame]) -> None:
         """Generate and display summary report."""
-        print("\n" + "="*60)
+        print("="*60)
         print("DATA PREPARATION SUMMARY")
         print("="*60)
 
