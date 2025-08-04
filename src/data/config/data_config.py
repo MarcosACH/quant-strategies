@@ -261,10 +261,19 @@ class DataConfig:
     def __str__(self) -> str:
         """String representation of configuration."""
         split_dates = self.get_split_dates()
+        train_duration = split_dates.get('train', (None, None))[1] - split_dates.get(
+            'train', (None, None))[0] if split_dates.get('train') else timedelta(0)
+        validation_duration = split_dates.get('validation', (None, None))[1] - split_dates.get(
+            'validation', (None, None))[0] if split_dates.get('validation') else timedelta(0)
+        test_duration = split_dates.get('test', (None, None))[1] - split_dates.get(
+            'test', (None, None))[0] if split_dates.get('test') else timedelta(0)
+
         return f"""DataConfig: {self.config_name}
 Symbol: {self.symbol} ({self.exchange})
 Period: {self.start_date.strftime('%Y-%m-%d')} to {self.end_date.strftime('%Y-%m-%d')}
 Timeframe: {self.timeframe}
 Expected Data Points: {self.get_expected_data_points():,}
-Splits: Train {self.split_config.train_pct:.0%} | Val {self.split_config.validation_pct or 0:.0%} | Test {self.split_config.test_pct or 0:.0%}
-Train: {split_dates['train'][0].strftime('%Y-%m-%d')} to {split_dates['train'][1].strftime('%Y-%m-%d')}"""
+Splits: Train {self.split_config.train_pct:.0%} | Validation {self.split_config.validation_pct or 0:.0%} | Test {self.split_config.test_pct or 0:.0%}
+Train: {split_dates.get('train', (None, None))[0].strftime('%Y-%m-%d') if split_dates.get('train') else 'N/A'} to {split_dates.get('train', (None, None))[1].strftime('%Y-%m-%d') if split_dates.get('train') else 'N/A'} ({train_duration.days} days)
+Validation: {split_dates.get('validation', (None, None))[0].strftime('%Y-%m-%d') if split_dates.get('validation') else 'N/A'} to {split_dates.get('validation', (None, None))[1].strftime('%Y-%m-%d') if split_dates.get('validation') else 'N/A'} ({validation_duration.days} days)
+Test: {split_dates.get('test', (None, None))[0].strftime('%Y-%m-%d') if split_dates.get('test') else 'N/A'} to {split_dates.get('test', (None, None))[1].strftime('%Y-%m-%d') if split_dates.get('test') else 'N/A'} ({test_duration.days} days)"""

@@ -189,22 +189,12 @@ class BacktestRunner:
             description=self.description
         )
 
-        print("DATA CONFIGURATION")
+        print("\nDATA CONFIGURATION")
         print("=" * 50)
         print(str(data_config))
 
-        split_dates = data_config.get_split_dates()
-        print(f"\nSplit Dates:")
-        for split_name, (start, end) in split_dates.items():
-            duration = end - start
-            print(
-                f"   {split_name.upper():12} {start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')} ({duration.days} days)")
-
-        print(
-            f"\nExpected data points: {data_config.get_expected_data_points():,}")
-
         print("\nREADY TO PREPARE DATA")
-        print("This will download and process the full dataset.")
+        print("This will collect and process the data from the data base.")
         response = input("Continue? (y/N): ").strip().lower()
 
         if response != 'y':
