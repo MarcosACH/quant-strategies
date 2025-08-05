@@ -4,6 +4,7 @@ import numpy as np
 import vectorbt as vbt
 import sys
 from pathlib import Path
+from functools import partial
 
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
@@ -113,7 +114,20 @@ def simulate_portfolio(
     return param_dict
 
 
-def objective(trial, data, indicator, order_func_nb, fee_decimal, sizing_method, risk_pct, initial_cash, frequency, cash_sharing, use_numba, stat_names):
+def objective(
+    trial,
+    data,
+    indicator,
+    order_func_nb,
+    fee_decimal,
+    sizing_method,
+    risk_pct,
+    initial_cash,
+    frequency,
+    cash_sharing,
+    use_numba,
+    stat_names
+):
     bbands_length = trial.suggest_int("bbands_length", 25, 45, step=10)
     bbands_stddev = trial.suggest_float("bbands_stddev", 2.0, 3.0, step=0.5)
     cvd_length = trial.suggest_int("cvd_length", 35, 45, step=5)
@@ -132,20 +146,75 @@ def objective(trial, data, indicator, order_func_nb, fee_decimal, sizing_method,
 
     results = simulate_portfolio(data, indicator, param_ranges, order_func_nb, fee_decimal,
                                  sizing_method, risk_pct, initial_cash, frequency, cash_sharing, use_numba, stat_names)
-    return -results["max_drawdown_pct"], results["sharpe_ratio"]
+
+    return results["max_drawdown_pct"], results["sharpe_ratio"]
+
+
+def run_optimization_with_sampler(
+    data,
+    indicator,
+    order_func_nb,
+    fee_decimal,
+    sizing_method,
+    risk_pct,
+    initial_cash,
+    frequency,
+    cash_sharing,
+    use_numba,
+    stat_names,
+    sampler_name,
+    n_trials=100,
+    param_grid=None
+):
+    if sampler_name not in ["tpe", "grid", "random", "cmaes", "gp", "nsgaii", "qmc"]:
+        raise ValueError(
+            f"Unsupported sampler: {sampler_name}. Supported samplers are: {['tpe', 'grid', 'random', 'cmaes', 'gp', 'nsgaii', 'qmc']}")
+
+    if sampler_name == "grid" and param_grid is None:
+        raise ValueError("param_grid must be provided for grid sampler")
+
+    samplers = {
+        "tpe": optuna.samplers.TPESampler(multivariate=True, seed=42),
+        "grid": optuna.samplers.GridSampler(param_grid) if sampler_name == "grid" else None,
+        "random": optuna.samplers.RandomSampler(seed=42),
+        "cmaes": optuna.samplers.CmaEsSampler(seed=42),
+        "gp": optuna.samplers.GPSampler(seed=42),
+        "nsgaii": optuna.samplers.NSGAIISampler(population_size=50, seed=42),
+        "qmc": optuna.samplers.QMCSampler(qmc_type="sobol", seed=42)
+    }
+
+    study = optuna.create_study(
+        direction="maximize",
+        sampler=samplers[sampler_name],
+        study_name=f"trading_strategy_{sampler_name}"
+    )
+
+    bound_objective = partial(
+        objective,
+        data=data,
+        indicator=indicator,
+        order_func_nb=order_func_nb,
+        fee_decimal=fee_decimal,
+        sizing_method=sizing_method,
+        risk_pct=risk_pct,
+        initial_cash=initial_cash,
+        frequency=frequency,
+        cash_sharing=cash_sharing,
+        use_numba=use_numba,
+        stat_names=stat_names
+    )
+
+    study.optimize(bound_objective, n_trials=n_trials, n_jobs=-1)
+
+    df = study.trials_dataframe()
+    pl_df = pl.from_pandas(df)
+
+    return study, pl_df
 
 
 if __name__ == "__main__":
     indicator = CVDBBPullbackStrategy().create_indicator()
     order_func_nb = CVDBBPullbackStrategy().get_order_func_nb()
-    params = {
-        "bbands_length": 50,  # []
-        "bbands_stddev": 2.0,
-        "cvd_length": 35,
-        "atr_length": 5,
-        "sl_coef": 2.0,
-        "tpsl_ratio": 3.0
-    }
 
     split_config = DataSplitConfig(
         train_pct=100,
@@ -166,34 +235,46 @@ if __name__ == "__main__":
 
     prepared_datasets = pipeline.prepare_data(save_to_disk=False)
 
-    # results = simulate_portfolio(
-    #     data=prepared_datasets["train"],
-    #     indicator=indicator,
-    #     params=params,
-    #     order_func_nb=order_func_nb,
-    #     fee_decimal=0.0005,
-    #     sizing_method="Risk percent",
-    #     risk_pct=1.0,
-    #     initial_cash=1000,
-    #     frequency="1h",
-    #     cash_sharing=True,
-    #     use_numba=True,
-    #     stat_names=["Sharpe Ratio", "Max Drawdown [%]", "Total Return [%]"]
+    # study = optuna.create_study(sampler=GPSampler(
+    #     seed=42), directions=["maximize", "minimize"])
+    # study.optimize(
+    #     lambda trial: objective(
+    #         trial, prepared_datasets["train"], indicator, order_func_nb, 0.0005, "Risk percent", 1.0, 1000, "1h", True, True, [
+    #             "Max Drawdown [%]", "Sharpe Ratio"]
+    #     ),
+    #     n_trials=100,
+    #     n_jobs=-1
     # )
+    # # study.optimize(objective, n_trials=100, n_jobs=-1)
 
-    # print("Backtest Results:", results)
+    # df = study.trials_dataframe()
+    # pl_df = pl.from_pandas(df)
+    # print(pl_df)
 
-    study = optuna.create_study(directions=["maximize", "minimize"])
-    study.optimize(
-        lambda trial: objective(
-            trial, prepared_datasets["train"], indicator, order_func_nb, 0.0005, "Risk percent", 1.0, 1000, "1h", True, True, [
-                "Max Drawdown [%]", "Sharpe Ratio"]
-        ),
-        n_trials=100,
-        n_jobs=-1
-    )
-    # study.optimize(objective, n_trials=100, n_jobs=-1)
+    strategies = ["tpe", "random", "cmaes", "gp"]
 
-    df = study.trials_dataframe()
-    pl_df = pl.from_pandas(df)
-    print(pl_df)
+    results = {}
+    for strategy in strategies:
+        print(f"Running optimization with {strategy.upper()} sampler...")
+        study, pl_df = run_optimization_with_sampler(
+            prepared_datasets["train"],
+            indicator,
+            order_func_nb,
+            0.0005,
+            "Risk percent",
+            1.0,
+            1000,
+            "1h",
+            True,
+            True,
+            ["Max Drawdown [%]", "Sharpe Ratio"],
+            strategy
+        )
+        results[strategy] = {
+            "study": study,
+            "dataframe": pl_df,
+            "best_params": study.best_params,
+            "best_values": study.best_values
+        }
+        print(f"Best parameters for {strategy}: {study.best_params}")
+        print(f"Best values for {strategy}: {study.best_values}")
