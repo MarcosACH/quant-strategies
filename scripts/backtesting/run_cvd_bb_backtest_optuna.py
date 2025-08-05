@@ -113,18 +113,26 @@ def simulate_portfolio(
     return param_dict
 
 
-# def objective(trial):
-#     param_ranges = {
-#         "bbands_length": np.arange(25, 150, 10),
-#         "bbands_stddev": np.arange(2.0, 6.0, 0.5),
-#         "cvd_length": np.arange(35, 60, 5),
-#         "atr_length": np.arange(5, 25, 5),
-#         "sl_coef": np.arange(2.0, 3.5, 0.5),
-#         "tpsl_ratio": np.arange(3.0, 5.5, 0.5)
-#     }
+def objective(trial, data, indicator, order_func_nb, fee_decimal, sizing_method, risk_pct, initial_cash, frequency, cash_sharing, use_numba, stat_names):
+    bbands_length = trial.suggest_int("bbands_length", 25, 45, step=10)
+    bbands_stddev = trial.suggest_float("bbands_stddev", 2.0, 3.0, step=0.5)
+    cvd_length = trial.suggest_int("cvd_length", 35, 45, step=5)
+    atr_length = trial.suggest_int("atr_length", 5, 15, step=5)
+    sl_coef = trial.suggest_float("sl_coef", 2.0, 3.0, step=0.5)
+    tpsl_ratio = trial.suggest_float("tpsl_ratio", 3.0, 4.0, step=0.5)
 
-#     results = backtest_strategy(param_ranges)
-#     return results["sharpe"], -results["drawdown"]
+    param_ranges = {
+        "bbands_length": bbands_length,
+        "bbands_stddev": bbands_stddev,
+        "cvd_length": cvd_length,
+        "atr_length": atr_length,
+        "sl_coef": sl_coef,
+        "tpsl_ratio": tpsl_ratio
+    }
+
+    results = simulate_portfolio(data, indicator, param_ranges, order_func_nb, fee_decimal,
+                                 sizing_method, risk_pct, initial_cash, frequency, cash_sharing, use_numba, stat_names)
+    return -results["max_drawdown_pct"], results["sharpe_ratio"]
 
 
 if __name__ == "__main__":
@@ -158,25 +166,34 @@ if __name__ == "__main__":
 
     prepared_datasets = pipeline.prepare_data(save_to_disk=False)
 
-    results = simulate_portfolio(
-        data=prepared_datasets["train"],
-        indicator=indicator,
-        params=params,
-        order_func_nb=order_func_nb,
-        fee_decimal=0.0005,
-        sizing_method="Risk percent",
-        risk_pct=1.0,
-        initial_cash=1000,
-        frequency="1h",
-        cash_sharing=True,
-        use_numba=True,
-        stat_names=["Sharpe Ratio", "Max Drawdown [%]", "Total Return [%]"]
+    # results = simulate_portfolio(
+    #     data=prepared_datasets["train"],
+    #     indicator=indicator,
+    #     params=params,
+    #     order_func_nb=order_func_nb,
+    #     fee_decimal=0.0005,
+    #     sizing_method="Risk percent",
+    #     risk_pct=1.0,
+    #     initial_cash=1000,
+    #     frequency="1h",
+    #     cash_sharing=True,
+    #     use_numba=True,
+    #     stat_names=["Sharpe Ratio", "Max Drawdown [%]", "Total Return [%]"]
+    # )
+
+    # print("Backtest Results:", results)
+
+    study = optuna.create_study(directions=["maximize", "minimize"])
+    study.optimize(
+        lambda trial: objective(
+            trial, prepared_datasets["train"], indicator, order_func_nb, 0.0005, "Risk percent", 1.0, 1000, "1h", True, True, [
+                "Max Drawdown [%]", "Sharpe Ratio"]
+        ),
+        n_trials=100,
+        n_jobs=-1
     )
+    # study.optimize(objective, n_trials=100, n_jobs=-1)
 
-    print("Backtest Results:", results)
-
-    # study = optuna.create_study(directions=["maximize", "minimize"])
-    # study.optimize(objective, n_trials=100, n_jobs=4)
-
-    # df = study.trials_dataframe()
-    # pl_df = pl.from_pandas(df)
+    df = study.trials_dataframe()
+    pl_df = pl.from_pandas(df)
+    print(pl_df)
