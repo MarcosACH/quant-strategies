@@ -164,7 +164,9 @@ def run_optimization_with_sampler(
     stat_names,
     sampler_name,
     n_trials=100,
-    param_grid=None
+    param_grid=None,
+    plot_param_importances=False,
+    plot_pareto_front=False
 ):
     if sampler_name not in ["tpe", "grid", "random", "cmaes", "gp", "nsgaii", "qmc"]:
         raise ValueError(
@@ -172,6 +174,9 @@ def run_optimization_with_sampler(
 
     if sampler_name == "grid" and param_grid is None:
         raise ValueError("param_grid must be provided for grid sampler")
+
+    if sampler_name == "cmaes":
+        print("WARNING: If the study is being used for multi-objective optimization, CmaEsSampler cannot be used.")
 
     samplers = {
         "tpe": optuna.samplers.TPESampler(multivariate=True, seed=42),
@@ -184,7 +189,7 @@ def run_optimization_with_sampler(
     }
 
     study = optuna.create_study(
-        direction="maximize",
+        directions=["minimize", "maximize"],
         sampler=samplers[sampler_name],
         study_name=f"trading_strategy_{sampler_name}"
     )
@@ -205,6 +210,44 @@ def run_optimization_with_sampler(
     )
 
     study.optimize(bound_objective, n_trials=n_trials, n_jobs=-1)
+
+    if plot_param_importances or plot_pareto_front:
+        from plotly.subplots import make_subplots
+        import plotly.graph_objects as go
+
+        if plot_param_importances and plot_pareto_front:
+            fig = make_subplots(
+                rows=1, cols=2,
+                subplot_titles=('Parameter Importances', 'Pareto Front'),
+                specs=[[{"secondary_y": False}, {"secondary_y": False}]]
+            )
+
+            param_fig = optuna.visualization.plot_param_importances(study)
+            for trace in param_fig.data:
+                fig.add_trace(trace, row=1, col=1)
+
+            pareto_fig = optuna.visualization.plot_pareto_front(study)
+            for trace in pareto_fig.data:
+                fig.add_trace(trace, row=1, col=2)
+
+            fig.update_layout(
+                title_text=f"Optimization Results - {sampler_name.upper()} Sampler",
+                showlegend=False,
+                height=1000,
+                width=1800
+            )
+
+            fig.update_xaxes(title_text="Importance", row=1, col=1)
+            fig.update_xaxes(title_text="Max Drawdown [%]", row=1, col=2)
+            fig.update_yaxes(title_text="Parameters", row=1, col=1)
+            fig.update_yaxes(title_text="Sharpe Ratio", row=1, col=2)
+
+            fig.show()
+        else:
+            if plot_param_importances:
+                optuna.visualization.plot_param_importances(study).show()
+            if plot_pareto_front:
+                optuna.visualization.plot_pareto_front(study).show()
 
     df = study.trials_dataframe()
     pl_df = pl.from_pandas(df)
@@ -235,46 +278,39 @@ if __name__ == "__main__":
 
     prepared_datasets = pipeline.prepare_data(save_to_disk=False)
 
-    # study = optuna.create_study(sampler=GPSampler(
-    #     seed=42), directions=["maximize", "minimize"])
-    # study.optimize(
-    #     lambda trial: objective(
-    #         trial, prepared_datasets["train"], indicator, order_func_nb, 0.0005, "Risk percent", 1.0, 1000, "1h", True, True, [
-    #             "Max Drawdown [%]", "Sharpe Ratio"]
-    #     ),
-    #     n_trials=100,
-    #     n_jobs=-1
-    # )
-    # # study.optimize(objective, n_trials=100, n_jobs=-1)
-
-    # df = study.trials_dataframe()
-    # pl_df = pl.from_pandas(df)
-    # print(pl_df)
-
-    strategies = ["tpe", "random", "cmaes", "gp"]
+    strategies = ["gp"]
 
     results = {}
     for strategy in strategies:
-        print(f"Running optimization with {strategy.upper()} sampler...")
+        print(f"\nRunning optimization with {strategy.upper()} sampler...")
         study, pl_df = run_optimization_with_sampler(
-            prepared_datasets["train"],
-            indicator,
-            order_func_nb,
-            0.0005,
-            "Risk percent",
-            1.0,
-            1000,
-            "1h",
-            True,
-            True,
-            ["Max Drawdown [%]", "Sharpe Ratio"],
-            strategy
+            data=prepared_datasets["train"],
+            indicator=indicator,
+            order_func_nb=order_func_nb,
+            fee_decimal=0.0005,
+            sizing_method="Risk percent",
+            risk_pct=1.0,
+            initial_cash=1000,
+            frequency="1h",
+            cash_sharing=True,
+            use_numba=True,
+            stat_names=["Max Drawdown [%]", "Sharpe Ratio"],
+            sampler_name=strategy,
+            n_trials=20,
+            plot_param_importances=True,
+            plot_pareto_front=True
         )
         results[strategy] = {
             "study": study,
             "dataframe": pl_df,
-            "best_params": study.best_params,
-            "best_values": study.best_values
+            "pareto_trials": study.best_trials
         }
-        print(f"Best parameters for {strategy}: {study.best_params}")
-        print(f"Best values for {strategy}: {study.best_values}")
+
+        print(f"\n=== Pareto-optimal solutions for {strategy.upper()} ===")
+        for i, trial in enumerate(study.best_trials):
+            max_dd, sharpe = trial.values
+            print(f"Solution {i+1}:")
+            print(f"  Max Drawdown: {max_dd:.2f}%")
+            print(f"  Sharpe Ratio: {sharpe:.3f}")
+            print(f"  Parameters: {trial.params}")
+            print()
