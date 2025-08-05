@@ -28,7 +28,7 @@ class DataSplitConfig:
             raise ValueError(
                 f"Split percentages must sum to 100.0, got {total_pct}")
 
-        if self.train_pct <= 0 or self.train_pct >= 100:
+        if self.train_pct <= 0 or self.train_pct >= 100 and self.validation_pct is not None and self.test_pct is not None:
             raise ValueError("Train percentage must be between 0 and 100")
 
         if self.validation_pct is not None and (self.validation_pct <= 0 or self.validation_pct >= 100):
