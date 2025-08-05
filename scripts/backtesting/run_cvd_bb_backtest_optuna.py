@@ -166,7 +166,8 @@ def run_optimization_with_sampler(
     n_trials=100,
     param_grid=None,
     plot_param_importances=False,
-    plot_pareto_front=False
+    plot_pareto_front=False,
+    storage_url=None
 ):
     if sampler_name not in ["tpe", "grid", "random", "cmaes", "gp", "nsgaii", "qmc"]:
         raise ValueError(
@@ -191,7 +192,9 @@ def run_optimization_with_sampler(
     study = optuna.create_study(
         directions=["minimize", "maximize"],
         sampler=samplers[sampler_name],
-        study_name=f"trading_strategy_{sampler_name}"
+        study_name=f"trading_strategy_{sampler_name}",
+        storage=storage_url,
+        load_if_exists=True  # This allows resuming studies
     )
 
     bound_objective = partial(
@@ -278,6 +281,15 @@ if __name__ == "__main__":
 
     prepared_datasets = pipeline.prepare_data(save_to_disk=False)
 
+    # Create SQLite database for Optuna Dashboard
+    from pathlib import Path
+    db_path = Path(__file__).parent.parent.parent / "results" / "optuna_studies.db"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    storage_url = f"sqlite:///{db_path}"
+    
+    print(f"Optuna studies will be saved to: {db_path}")
+    print(f"To view in Optuna Dashboard, use storage URL: {storage_url}")
+
     strategies = ["gp"]
 
     results = {}
@@ -298,7 +310,8 @@ if __name__ == "__main__":
             sampler_name=strategy,
             n_trials=20,
             plot_param_importances=True,
-            plot_pareto_front=True
+            plot_pareto_front=True,
+            storage_url=storage_url
         )
         results[strategy] = {
             "study": study,
@@ -314,3 +327,16 @@ if __name__ == "__main__":
             print(f"  Sharpe Ratio: {sharpe:.3f}")
             print(f"  Parameters: {trial.params}")
             print()
+
+    print(f"\n{'='*60}")
+    print("OPTUNA DASHBOARD INSTRUCTIONS:")
+    print(f"{'='*60}")
+    print(f"1. Database location: {db_path}")
+    print(f"2. Storage URL: {storage_url}")
+    print("3. To view in VS Code Optuna Dashboard:")
+    print("   - Open Command Palette (Ctrl+Shift+P)")
+    print("   - Type 'Optuna Dashboard: Open'")
+    print("   - Enter the storage URL when prompted")
+    print("4. Or start dashboard manually:")
+    print(f"   optuna-dashboard {storage_url}")
+    print(f"{'='*60}")
