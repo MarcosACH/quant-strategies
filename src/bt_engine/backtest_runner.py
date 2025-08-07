@@ -25,6 +25,8 @@ Usage:
     runner.run_backtest(param_selector, method="grid", optimization_metric="sharpe_ratio")
 """
 
+# TODO: Use save_results from simulate_portfolios to save results, instead of creating save_results() function. Or use save_results() functions to meet with Single Responsibility Principle (SRP)
+
 import sys
 import polars as pl
 import numpy as np
