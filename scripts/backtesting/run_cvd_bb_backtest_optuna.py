@@ -5,11 +5,14 @@ import vectorbt as vbt
 import sys
 from pathlib import Path
 from functools import partial
+import pandas as pd
+from typing import Optional, List
 
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
 try:
+    from config.settings import settings
     from src.strategies.implementations.cvd_bb_pullback import CVDBBPullbackStrategy
     from src.data.config import DataConfig, DataSplitConfig
     from src.data.pipeline import DataPreparationPipeline
@@ -17,6 +20,26 @@ except ImportError as e:
     print(f"Error importing modules: {e}")
     print(f"Make sure you're running from the project root or the modules exist.")
     sys.exit(1)
+
+
+def make_json_serializable(value):
+    """Convert non-serializable values to JSON-compatible formats."""
+    if pd.isna(value):
+        return None
+    elif isinstance(value, pd.Timedelta):
+        return float(value.total_seconds())
+    elif isinstance(value, (pd.Timestamp, np.datetime64)):
+        return str(value)
+    elif isinstance(value, np.integer):
+        return int(value)
+    elif isinstance(value, np.floating):
+        return float(value)
+    elif isinstance(value, (list, tuple)):
+        return [make_json_serializable(item) for item in value]
+    elif isinstance(value, dict):
+        return {k: make_json_serializable(v) for k, v in value.items()}
+    else:
+        return value
 
 
 def simulate_portfolio(
@@ -31,7 +54,7 @@ def simulate_portfolio(
     frequency,
     cash_sharing,
     use_numba,
-    stat_names
+    stats_subset: Optional[List[str]] = None
 ):
 
     open_prices = data["open"].to_numpy()
@@ -83,7 +106,6 @@ def simulate_portfolio(
 
     param_dict = {}
     stats = pf.stats()
-    stat_names_set = set(stat_names)
 
     stat_mapping = {
         "period": "Period",
@@ -107,9 +129,11 @@ def simulate_portfolio(
         "sortino_ratio": "Sortino Ratio"
     }
 
-    for key, stat_name in stat_mapping.items():
-        if stat_name in stat_names_set:
-            param_dict[key] = stats.get(stat_name, np.nan)
+    stat_names = {stat_key: stat_value for stat_key, stat_value in stat_mapping.items(
+    ) if stat_value in stats_subset} if stats_subset else stat_mapping
+
+    for stat_key, stat_value in stat_names.items():
+        param_dict[stat_key] = stats.get(stat_value, np.nan)
 
     return param_dict
 
@@ -126,7 +150,8 @@ def objective(
     frequency,
     cash_sharing,
     use_numba,
-    stat_names
+    optimization_metrics,
+    stats_subset: Optional[List[str]] = None
 ):
     bbands_length = trial.suggest_int("bbands_length", 25, 45, step=10)
     bbands_stddev = trial.suggest_float("bbands_stddev", 2.0, 3.0, step=0.5)
@@ -145,9 +170,14 @@ def objective(
     }
 
     results = simulate_portfolio(data, indicator, param_ranges, order_func_nb, fee_decimal,
-                                 sizing_method, risk_pct, initial_cash, frequency, cash_sharing, use_numba, stat_names)
+                                 sizing_method, risk_pct, initial_cash, frequency, cash_sharing, use_numba, stats_subset)
 
-    return results["max_drawdown_pct"], results["sharpe_ratio"]
+    for stat_key, stat_value in results.items():
+        if stat_key not in optimization_metrics:
+            serializable_value = make_json_serializable(stat_value)
+            trial.set_user_attr(stat_key, serializable_value)
+
+    return [results[metric] for metric in optimization_metrics]
 
 
 def run_optimization_with_sampler(
@@ -161,13 +191,16 @@ def run_optimization_with_sampler(
     frequency,
     cash_sharing,
     use_numba,
-    stat_names,
+    optimization_metrics,
+    directions,
     sampler_name,
+    stats_subset=None,
     n_trials=100,
     param_grid=None,
     plot_param_importances=False,
     plot_pareto_front=False,
-    storage_url=None
+    storage_url=None,
+    save_results=True
 ):
     if sampler_name not in ["tpe", "grid", "random", "cmaes", "gp", "nsgaii", "qmc"]:
         raise ValueError(
@@ -190,11 +223,11 @@ def run_optimization_with_sampler(
     }
 
     study = optuna.create_study(
-        directions=["minimize", "maximize"],
+        directions=directions,
         sampler=samplers[sampler_name],
         study_name=f"trading_strategy_{sampler_name}",
         storage=storage_url,
-        load_if_exists=True  # This allows resuming studies
+        load_if_exists=True
     )
 
     bound_objective = partial(
@@ -209,10 +242,21 @@ def run_optimization_with_sampler(
         frequency=frequency,
         cash_sharing=cash_sharing,
         use_numba=use_numba,
-        stat_names=stat_names
+        optimization_metrics=optimization_metrics,
+        stats_subset=stats_subset
     )
 
-    study.optimize(bound_objective, n_trials=n_trials, n_jobs=-1)
+    study.optimize(bound_objective, n_trials=n_trials,
+                   n_jobs=settings.MAX_PARALLEL_JOBS)
+    df = study.trials_dataframe()
+    pl_df = pl.from_pandas(df)
+
+    if save_results:
+        filename = f"optuna_stats.csv"
+        filepath = settings.RESULTS_ROOT_PATH / "backtests" / "optuna" / filename
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+
+        pl_df.write_csv(filepath, float_precision=6)
 
     if plot_param_importances or plot_pareto_front:
         from plotly.subplots import make_subplots
@@ -252,8 +296,23 @@ def run_optimization_with_sampler(
             if plot_pareto_front:
                 optuna.visualization.plot_pareto_front(study).show()
 
-    df = study.trials_dataframe()
-    pl_df = pl.from_pandas(df)
+    # user_attrs_data = []
+    # for trial in study.trials:
+    #     trial_attrs = trial.user_attrs.copy()
+    #     trial_attrs['trial_number'] = trial.number
+    #     user_attrs_data.append(trial_attrs)
+
+    # if user_attrs_data:
+    #     user_attrs_df = pl.DataFrame(user_attrs_data)
+
+    #     pl_df = pl.from_pandas(df)
+
+    #     if 'number' in pl_df.columns and 'trial_number' in user_attrs_df.columns:
+    #         pl_df = pl_df.join(user_attrs_df, left_on='number', right_on='trial_number', how='left')
+    #         if 'trial_number' in pl_df.columns:
+    #             pl_df = pl_df.drop('trial_number')
+    # else:
+    #     pl_df = pl.from_pandas(df)
 
     return study, pl_df
 
@@ -281,12 +340,12 @@ if __name__ == "__main__":
 
     prepared_datasets = pipeline.prepare_data(save_to_disk=False)
 
-    # Create SQLite database for Optuna Dashboard
     from pathlib import Path
-    db_path = Path(__file__).parent.parent.parent / "results" / "optuna_studies.db"
+    db_path = Path(__file__).parent.parent.parent / \
+        "results" / "optuna_studies.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
     storage_url = f"sqlite:///{db_path}"
-    
+
     print(f"Optuna studies will be saved to: {db_path}")
     print(f"To view in Optuna Dashboard, use storage URL: {storage_url}")
 
@@ -306,12 +365,14 @@ if __name__ == "__main__":
             frequency="1h",
             cash_sharing=True,
             use_numba=True,
-            stat_names=["Max Drawdown [%]", "Sharpe Ratio"],
+            optimization_metrics=["max_drawdown_pct", "sharpe_ratio"],
+            directions=["minimize", "maximize"],
             sampler_name=strategy,
             n_trials=20,
-            plot_param_importances=True,
-            plot_pareto_front=True,
-            storage_url=storage_url
+            plot_param_importances=False,
+            plot_pareto_front=False,
+            storage_url=storage_url,
+            save_results=True
         )
         results[strategy] = {
             "study": study,
@@ -327,16 +388,3 @@ if __name__ == "__main__":
             print(f"  Sharpe Ratio: {sharpe:.3f}")
             print(f"  Parameters: {trial.params}")
             print()
-
-    print(f"\n{'='*60}")
-    print("OPTUNA DASHBOARD INSTRUCTIONS:")
-    print(f"{'='*60}")
-    print(f"1. Database location: {db_path}")
-    print(f"2. Storage URL: {storage_url}")
-    print("3. To view in VS Code Optuna Dashboard:")
-    print("   - Open Command Palette (Ctrl+Shift+P)")
-    print("   - Type 'Optuna Dashboard: Open'")
-    print("   - Enter the storage URL when prompted")
-    print("4. Or start dashboard manually:")
-    print(f"   optuna-dashboard {storage_url}")
-    print(f"{'='*60}")
