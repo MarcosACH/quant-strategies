@@ -180,6 +180,59 @@ def objective(
     return [results[metric] for metric in optimization_metrics]
 
 
+def _format_duration_to_days_hms(duration) -> str:
+    """
+    Format a Polars Duration to days HH:MM:SS format.
+
+    Args:
+        duration: Polars Duration value
+
+    Returns:
+        String in format "X days HH:MM:SS" or "HH:MM:SS" if less than 1 day
+    """
+    if duration is None:
+        return None
+
+    total_seconds = duration.total_seconds()
+
+    days = int(total_seconds // 86400)
+    remaining_seconds = total_seconds % 86400
+    hours = int(remaining_seconds // 3600)
+    minutes = int((remaining_seconds % 3600) // 60)
+    seconds = int(remaining_seconds % 60)
+
+    return f"{days} days {hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def save_results_f(results: pl.DataFrame) -> None:
+    """Save results to csv file."""
+    filename = f"optuna_stats.csv"
+    filepath = settings.RESULTS_ROOT_PATH / "backtests" / "optuna" / filename
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    for col in results.columns:
+        dtype = results[col].dtype
+
+        if dtype == pl.Duration:
+            results = results.with_columns(
+                pl.col(col).map_elements(
+                    lambda x: _format_duration_to_days_hms(
+                        x) if x is not None else None,
+                    return_dtype=pl.Utf8
+                )
+            )
+
+    results.write_csv(filepath, float_precision=6)
+    print(f"\nResults saved to: {filepath}")
+
+    duration_cols = [col for col in results.columns
+                     if results[col].dtype == pl.Utf8 and len(results) > 0
+                     and any(str(val).count(':') == 2 for val in results[col].head(5) if val is not None)]
+    if duration_cols:
+        print(
+            f"Note: Duration columns {duration_cols} were converted to 'days HH:MM:SS' format for CSV compatibility")
+
+
 def run_optimization_with_sampler(
     data,
     indicator,
@@ -252,15 +305,10 @@ def run_optimization_with_sampler(
     pl_df = pl.from_pandas(df)
 
     if save_results:
-        filename = f"optuna_stats.csv"
-        filepath = settings.RESULTS_ROOT_PATH / "backtests" / "optuna" / filename
-        filepath.parent.mkdir(parents=True, exist_ok=True)
-
-        pl_df.write_csv(filepath, float_precision=6)
+        save_results_f(pl_df)
 
     if plot_param_importances or plot_pareto_front:
         from plotly.subplots import make_subplots
-        import plotly.graph_objects as go
 
         if plot_param_importances and plot_pareto_front:
             fig = make_subplots(
