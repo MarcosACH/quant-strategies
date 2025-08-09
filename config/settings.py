@@ -36,8 +36,9 @@ class Settings:
         # Optimization Settings
         self.MAX_PARALLEL_JOBS = -1
         self.OPTIMIZATION_TIMEOUT_HOURS = 24
-        self.VALIDATION_SPLIT_RATIO = 0.2
-        self.TEST_SPLIT_RATIO = 0.2
+        self.TRAIN_SPLIT_PCT = 60
+        self.VALIDATION_SPLIT_PCT = 20
+        self.TEST_SPLIT_PCT = 20
 
         # Risk Management
         self.MAX_POSITION_SIZE_PCT = 10
@@ -54,7 +55,6 @@ class Settings:
             self.RESULTS_ROOT_PATH,
             self.DATA_ROOT_PATH / "raw",
             self.DATA_ROOT_PATH / "processed",
-            self.DATA_ROOT_PATH / "backtest_results",
             self.RESULTS_ROOT_PATH / "backtests",
             self.RESULTS_ROOT_PATH / "optimization",
             self.RESULTS_ROOT_PATH / "validation",
