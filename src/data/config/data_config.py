@@ -15,9 +15,9 @@ from config.settings import settings
 @dataclass
 class DataSplitConfig:
     """Configuration for data splitting strategy."""
-    train_pct: float = 60
-    validation_pct: Optional[float] = 20
-    test_pct: Optional[float] = 20
+    train_pct: float = settings.TRAIN_SPLIT_PCT
+    validation_pct: Optional[float] = settings.VALIDATION_SPLIT_PCT
+    test_pct: Optional[float] = settings.TEST_SPLIT_PCT
     purge_days: int = 1  # Days to purge between splits to prevent leakage
 
     def __post_init__(self):
@@ -52,7 +52,7 @@ class DataConfig:
         timezone.utc) - timedelta(days=365))
     end_date: datetime = field(
         default_factory=lambda: datetime.now(timezone.utc))
-    timeframe: str = "1h"
+    timeframe: str = settings.DEFAULT_TIMEFRAME
 
     split_config: DataSplitConfig = field(default_factory=DataSplitConfig)
 
