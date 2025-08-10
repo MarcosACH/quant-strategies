@@ -25,16 +25,15 @@ Usage:
     runner.run_backtest(param_selector, method="grid", optimization_metric="sharpe_ratio")
 """
 
-# TODO: Use save_results from simulate_portfolios to save results, instead of creating save_results() function. Or use save_results() functions to meet with Single Responsibility Principle (SRP)
-
 import sys
 import polars as pl
 import numpy as np
 from pathlib import Path
 import time
 import json
-from typing import Dict, List, Any, Literal
+from typing import Dict, List, Any, Literal, Optional
 from datetime import datetime, timezone
+from config.settings import settings
 from skopt import gp_minimize
 from skopt.utils import use_named_args
 
@@ -86,9 +85,9 @@ class BacktestRunner:
                  risk_pct: float = 1.0,
                  config_name: str = None,
                  description: str = None,
-                 train_pct: float = 60,
-                 validation_pct: float = 20,
-                 test_pct: float = 20
+                 train_pct: Optional[float] = 60,
+                 validation_pct: Optional[float] = 20,
+                 test_pct: Optional[float] = 20
                  ):
         """
         Initialize the backtest runner.
@@ -124,12 +123,10 @@ class BacktestRunner:
 
         self.strategy = strategy
         self.query_service = query_service
-        self.results_dir = Path("data/backtest_results/optimization")
-        self.results_dir.mkdir(parents=True, exist_ok=True)
 
-        self.train_pct = train_pct
-        self.validation_pct = validation_pct
-        self.test_pct = test_pct
+        self.train_pct = train_pct or settings.TRAIN_SPLIT_PCT
+        self.validation_pct = validation_pct or settings.VALIDATION_SPLIT_PCT
+        self.test_pct = test_pct or settings.TEST_SPLIT_PCT
 
         self.config_name = config_name or f"{symbol.lower().replace('-', '_')}_{timeframe}_{start_date.replace('-', '')}_{end_date.replace('-', '')}"
         self.description = description or f"{symbol} {timeframe} data from {start_date} to {end_date}"
@@ -278,7 +275,6 @@ class BacktestRunner:
         if len(results) > 0:
             self.analyze_results(results, method, optimization_metric)
             if save_results:
-                self.save_results(results, method)
                 self.save_best_parameters(results, method, optimization_metric)
         else:
             print("No results generated from optimization")
@@ -302,7 +298,7 @@ class BacktestRunner:
             risk_pct=self.risk_pct,
             exchange_broker=self.exchange.lower(),
             date_range=f"grid_search_{self.config_name}",
-            save_results=False,
+            save_results=save_results,
             indicator_batch_size=50
         )
         return results
@@ -318,7 +314,7 @@ class BacktestRunner:
             risk_pct=self.risk_pct,
             exchange_broker=self.exchange.lower(),
             date_range=f"random_search_{self.config_name}",
-            save_results=False,
+            save_results=save_results,
             indicator_batch_size=50
         )
         return results
@@ -348,7 +344,7 @@ class BacktestRunner:
                 risk_pct=self.risk_pct,
                 exchange_broker=self.exchange.lower(),
                 date_range="bayesian_opt",
-                save_results=False,
+                save_results=save_results,
                 indicator_batch_size=1
             )
 
@@ -440,33 +436,6 @@ class BacktestRunner:
         for param in param_columns:
             print(f"   {param}: {best_row[param]}")
 
-    def save_results(self, results: pl.DataFrame, method: str) -> None:
-        """Save results to csv file."""
-        results_file = self.results_dir / \
-            f"{self.config_name}_{method}_results.csv"
-
-        for col in results.columns:
-            dtype = results[col].dtype
-
-            if dtype == pl.Duration:
-                results = results.with_columns(
-                    pl.col(col).map_elements(
-                        lambda x: self._format_duration_to_days_hms(
-                            x) if x is not None else None,
-                        return_dtype=pl.Utf8
-                    )
-                )
-
-        results.write_csv(results_file)
-        print(f"\nResults saved to: {results_file}")
-
-        duration_cols = [col for col in results.columns
-                         if results[col].dtype == pl.Utf8 and len(results) > 0
-                         and any(str(val).count(':') == 2 for val in results[col].head(5) if val is not None)]
-        if duration_cols:
-            print(
-                f"Note: Duration columns {duration_cols} were converted to 'days HH:MM:SS' format for CSV compatibility")
-
     def save_best_parameters(self, results: pl.DataFrame, method: str, optimization_metric: str) -> None:
         """
         Save the best parameters to a JSON file.
@@ -508,7 +477,7 @@ class BacktestRunner:
             'config_name': self.config_name
         }
 
-        params_file = self.results_dir / \
+        params_file = settings.RESULTS_ROOT_PATH / "best_params" / \
             f"{self.config_name}_{method}_best_params.json"
         with open(params_file, 'w') as f:
             json.dump(best_params, f, indent=2, default=str)
