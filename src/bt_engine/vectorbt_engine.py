@@ -383,16 +383,51 @@ class VectorBTEngine:
         filepath.parent.mkdir(parents=True, exist_ok=True)
         return str(filepath)
 
+    def _format_duration_to_days_hms(self, duration) -> str:
+        """
+        Format a Polars Duration to days HH:MM:SS format.
+
+        Args:
+            duration: Polars Duration value
+
+        Returns:
+            String in format "X days HH:MM:SS" or "HH:MM:SS" if less than 1 day
+        """
+        if duration is None:
+            return None
+
+        total_seconds = duration.total_seconds()
+
+        days = int(total_seconds // 86400)
+        remaining_seconds = total_seconds % 86400
+        hours = int(remaining_seconds // 3600)
+        minutes = int((remaining_seconds % 3600) // 60)
+        seconds = int(remaining_seconds % 60)
+
+        return f"{days} days {hours:02d}:{minutes:02d}:{seconds:02d}"
+
     def _save_batch_results(self, batch_results: List[Dict], filepath: str, is_first_batch: bool):
         """Save batch results to CSV file."""
         batch_df = pl.DataFrame(batch_results)
 
+        for col in batch_df.columns:
+            dtype = batch_df[col].dtype
+
+            if dtype == pl.Duration:
+                batch_df = batch_df.with_columns(
+                    pl.col(col).map_elements(
+                        lambda x: self._format_duration_to_days_hms(
+                            x) if x is not None else None,
+                        return_dtype=pl.Utf8
+                    )
+                )
+
         if is_first_batch:
-            batch_df.to_csv(filepath, index=False,
-                            float_format="%.6f", mode="w")
+            batch_df.write_csv(filepath, float_precision=6)
         else:
-            batch_df.to_csv(filepath, index=False,
-                            float_format="%.6f", mode="a", header=False)
+            existing_batch_df = pl.read_csv(filepath)
+            combined_batch_df = pl.concat([existing_batch_df, batch_df])
+            combined_batch_df.write_csv(filepath, float_precision=6)
 
     def load_results(self, filepath: str) -> pl.DataFrame:
         """Load results from CSV file with optimized dtypes."""

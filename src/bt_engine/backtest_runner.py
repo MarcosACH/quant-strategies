@@ -131,29 +131,6 @@ class BacktestRunner:
         self.config_name = config_name or f"{symbol.lower().replace('-', '_')}_{timeframe}_{start_date.replace('-', '')}_{end_date.replace('-', '')}"
         self.description = description or f"{symbol} {timeframe} data from {start_date} to {end_date}"
 
-    def _format_duration_to_days_hms(self, duration) -> str:
-        """
-        Format a Polars Duration to days HH:MM:SS format.
-
-        Args:
-            duration: Polars Duration value
-
-        Returns:
-            String in format "X days HH:MM:SS" or "HH:MM:SS" if less than 1 day
-        """
-        if duration is None:
-            return None
-
-        total_seconds = duration.total_seconds()
-
-        days = int(total_seconds // 86400)
-        remaining_seconds = total_seconds % 86400
-        hours = int(remaining_seconds // 3600)
-        minutes = int((remaining_seconds % 3600) // 60)
-        seconds = int(remaining_seconds % 60)
-
-        return f"{days} days {hours:02d}:{minutes:02d}:{seconds:02d}"
-
     def load_data(self, data_type: Literal['train', 'validation', 'test']) -> pl.DataFrame:
         """
         Load data from QuestDB.
@@ -231,6 +208,7 @@ class BacktestRunner:
             Backtest results DataFrame
         """
         start_time = time.time()
+        self.save_results = save_results
 
         if method == "random" and n_iter > np.prod([len(v) for v in param_ranges.values()]):
             raise ValueError(
@@ -298,7 +276,7 @@ class BacktestRunner:
             risk_pct=self.risk_pct,
             exchange_broker=self.exchange.lower(),
             date_range=f"grid_search_{self.config_name}",
-            save_results=save_results,
+            save_results=self.save_results,
             indicator_batch_size=50
         )
         return results
@@ -314,7 +292,7 @@ class BacktestRunner:
             risk_pct=self.risk_pct,
             exchange_broker=self.exchange.lower(),
             date_range=f"random_search_{self.config_name}",
-            save_results=save_results,
+            save_results=self.save_results,
             indicator_batch_size=50
         )
         return results
@@ -344,7 +322,7 @@ class BacktestRunner:
                 risk_pct=self.risk_pct,
                 exchange_broker=self.exchange.lower(),
                 date_range="bayesian_opt",
-                save_results=save_results,
+                save_results=self.save_results,
                 indicator_batch_size=1
             )
 
