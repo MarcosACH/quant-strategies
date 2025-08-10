@@ -45,6 +45,8 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from abc import ABC, abstractmethod
+from config.settings import settings
+from typing import Iterable
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -400,8 +402,53 @@ class TimeSeriesCrossValidator:
 
         self.splitter = self._create_splitter()
 
-        self.results_dir = Path("data/backtest_results/cross_validation")
-        self.results_dir.mkdir(parents=True, exist_ok=True)
+    @staticmethod
+    def _sanitize_for_json(obj: Any):
+        """Recursively convert values to JSON-safe types and replace NaN/Inf with null.
+
+        Rules:
+        - float/numpy floating: NaN/Inf -> None; else cast to float
+        - int/numpy integer: cast to int
+        - list/tuple/set: sanitize each element (sets become lists)
+        - dict: ensure string keys and sanitize values
+        - numpy arrays: convert to list then sanitize
+        - datetime/Path: convert to ISO string / path string
+        - other basic types (str, bool, None): return as-is
+        """
+        if obj is None or isinstance(obj, (str, bool)):
+            return obj
+
+        if isinstance(obj, (float, np.floating)):
+            if np.isnan(obj) or np.isinf(obj):
+                return None
+            return float(obj)
+
+        if isinstance(obj, (int, np.integer)):
+            return int(obj)
+
+        if isinstance(obj, np.ndarray):
+            return TimeSeriesCrossValidator._sanitize_for_json(obj.tolist())
+
+        if isinstance(obj, (list, tuple)):
+            return [TimeSeriesCrossValidator._sanitize_for_json(x) for x in obj]
+        if isinstance(obj, set):
+            return [TimeSeriesCrossValidator._sanitize_for_json(x) for x in obj]
+
+        if isinstance(obj, dict):
+            return {str(k): TimeSeriesCrossValidator._sanitize_for_json(v) for k, v in obj.items()}
+
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        if isinstance(obj, Path):
+            return str(obj)
+
+        if hasattr(obj, "item") and callable(getattr(obj, "item")):
+            try:
+                return TimeSeriesCrossValidator._sanitize_for_json(obj.item())
+            except Exception:
+                pass
+
+        return str(obj)
 
     def _create_splitter(self) -> TimeSeriesSplitter:
         """Create the appropriate splitter based on validation method."""
@@ -768,7 +815,7 @@ class TimeSeriesCrossValidator:
         """Save cross-validation results to disk."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        summary_file = self.results_dir / \
+        summary_file = settings.RESULTS_ROOT_PATH / "optimization" / "cross_validation" / \
             f"{config_name}_{self.validation_method.value}_summary_{timestamp}.json"
 
         summary_data = {
@@ -791,10 +838,12 @@ class TimeSeriesCrossValidator:
             }
         }
 
+        # Sanitize and save summary with strict JSON (no NaN/Inf)
         with open(summary_file, 'w') as f:
-            json.dump(summary_data, f, indent=2, default=str)
+            json.dump(self._sanitize_for_json(summary_data),
+                      f, indent=2, allow_nan=False)
 
-        detailed_file = self.results_dir / \
+        detailed_file = settings.RESULTS_ROOT_PATH / "optimization" / "cross_validation" / \
             f"{config_name}_{self.validation_method.value}_detailed_{timestamp}.json"
 
         detailed_data = []
@@ -816,8 +865,10 @@ class TimeSeriesCrossValidator:
                 }
             })
 
+        # Sanitize and save detailed results with strict JSON (no NaN/Inf)
         with open(detailed_file, 'w') as f:
-            json.dump(detailed_data, f, indent=2, default=str)
+            json.dump(self._sanitize_for_json(detailed_data),
+                      f, indent=2, allow_nan=False)
 
         print(f"\nResults saved:")
         print(f"  Summary: {summary_file}")
