@@ -52,7 +52,7 @@ class DataConfig:
         timezone.utc) - timedelta(days=365))
     end_date: datetime = field(
         default_factory=lambda: datetime.now(timezone.utc))
-    timeframe: str = settings.DEFAULT_TIMEFRAME
+    timeframe: str = settings.DEFAULT_FREQUENCY
 
     split_config: DataSplitConfig = field(default_factory=DataSplitConfig)
 
