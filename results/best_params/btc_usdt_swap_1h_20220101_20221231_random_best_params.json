@@ -1,0 +1,25 @@
+{
+  "CVDBB_bbands_length": 85,
+  "CVDBB_bbands_stddev": 3.909658762605772,
+  "CVDBB_cvd_length": 39,
+  "CVDBB_atr_length": 5,
+  "CVDBB_sl_coef": 2.6259396701015727,
+  "CVDBB_tpsl_ratio": 4.640853687542537,
+  "performance": {
+    "sharpe_ratio": 0.21822827983302442,
+    "total_return_pct": 1.2044697784075424,
+    "max_drawdown_pct": 9.494045523210142,
+    "win_rate_pct": 19.35483870967742,
+    "total_trades": 32,
+    "optimization_metric": "sharpe_ratio",
+    "optimization_value": 0.21822827983302442
+  },
+  "metadata": {
+    "symbol": "BTC-USDT-SWAP",
+    "timeframe": "1h",
+    "start_date": "2022-01-01T00:00:00+00:00",
+    "end_date": "2022-12-31T00:00:00+00:00",
+    "method": "random",
+    "config_name": "btc_usdt_swap_1h_20220101_20221231"
+  }
+}
