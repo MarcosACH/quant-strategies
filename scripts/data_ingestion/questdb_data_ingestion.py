@@ -4,6 +4,7 @@ import asyncio
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 import polars as pl
 from questdb.ingress import Sender
 
@@ -12,6 +13,7 @@ sys.path.append(str(project_root))
 
 try:
     from src.data.candlestream.exchanges.okx import OKX
+    from config.settings import settings
 except ImportError as e:
     print(f"Error importing modules: {e}")
     print(f"Make sure you're running from the project root or the modules exist.")
@@ -23,8 +25,8 @@ async def ingest_market_data(
     from_datetime: datetime = datetime(2020, 1, 1, tzinfo=timezone.utc),
     to_datetime: datetime = datetime(2025, 1, 1, tzinfo=timezone.utc),
     batch_size: int = 10,
-    questdb_host: str = "ec2-44-202-48-168.compute-1.amazonaws.com",
-    questdb_port: int = 9000,
+    questdb_host: Optional[str] = None,
+    questdb_port: Optional[int] = None,
     show_progress: bool = True
 ):
     """
@@ -40,6 +42,9 @@ async def ingest_market_data(
         show_progress: Show progress information
     """
     okx = OKX()
+
+    questdb_host = questdb_host or settings.QUESTDB_HOST
+    questdb_port = questdb_port or settings.QUESTDB_ILP_PORT
 
     print(f"Starting data ingestion for {symbol}")
     print(f"From: {from_datetime} to {to_datetime}")
@@ -83,8 +88,8 @@ async def main(
     from_date: str = "2020-01-01",
     to_date: str = None,
     batch_size: int = 10,
-    questdb_host: str = "ec2-44-202-48-168.compute-1.amazonaws.com",
-    questdb_port: int = 9000,
+    questdb_host: Optional[str] = None,
+    questdb_port: Optional[int] = None,
     show_progress: bool = True
 ):
     """Main function with command line interface."""
