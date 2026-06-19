@@ -123,11 +123,15 @@ The system connects to QuestDB using:
 - **HTTP Ingestion**: Port 9000 (for data ingestion)
 - **PostgreSQL Wire Protocol**: Port 8812 (for data queries)
 
+Connection details are read from the environment (see `.env.example`); the defaults match the
+local QuestDB started by `deployment/docker/docker-compose.yml`. Override them to target a remote
+instance.
+
 **Default Connection:**
 
-- Host: `ec2-44-202-48-168.compute-1.amazonaws.com`
-- Ingestion Port: 9000
-- Query Port: 8812
+- Host: `localhost` (`$QUESTDB_HOST`)
+- Ingestion Port: 9000 (`$QUESTDB_ILP_PORT`)
+- Query Port: 8812 (`$QUESTDB_PG_PORT`)
 - Database: `qdb`
 - Username: `admin`
 - Password: `quest`
