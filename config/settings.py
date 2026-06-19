@@ -39,7 +39,10 @@ class Settings:
         self.CACHE_EXPIRY_HOURS = 24
 
         # Optimization Settings
-        self.MAX_PARALLEL_JOBS = -1
+        # joblib n_jobs for grid search. Default 1 (safe): -1 (all cores) can
+        # exhaust memory during parallel numba compilation. Raise via env on
+        # machines with ample RAM.
+        self.MAX_PARALLEL_JOBS = int(os.getenv("MAX_PARALLEL_JOBS", "1"))
         self.OPTIMIZATION_TIMEOUT_HOURS = 24
         self.TRAIN_SPLIT_PCT = 60
         self.VALIDATION_SPLIT_PCT = 20
