@@ -1,0 +1,14 @@
+services:
+  questdb:
+    image: questdb/questdb:8.1.1
+    container_name: quant-questdb
+    ports:
+      - "9000:9000"   # REST API + ILP ingestion (data ingestion writes here)
+      - "8812:8812"   # PostgreSQL wire protocol (backtest queries read here)
+      - "9009:9009"   # ILP over TCP (optional)
+    volumes:
+      - questdb_data:/var/lib/questdb
+    restart: unless-stopped
+
+volumes:
+  questdb_data:
