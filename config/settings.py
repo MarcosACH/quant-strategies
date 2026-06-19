@@ -22,6 +22,11 @@ class Settings:
         self.DEFAULT_FEE_PCT = 0.05
         self.DEFAULT_FREQUENCY = "1m"
 
+        # QuestDB Connection (override via .env)
+        self.QUESTDB_HOST = os.getenv("QUESTDB_HOST", "localhost")
+        self.QUESTDB_PG_PORT = int(os.getenv("QUESTDB_PG_PORT", "8812"))
+        self.QUESTDB_ILP_PORT = int(os.getenv("QUESTDB_ILP_PORT", "9000"))
+
         # Logging Configuration
         self.LOG_LEVEL = "INFO"
         self.LOG_FILE = "logs/trading.log"
