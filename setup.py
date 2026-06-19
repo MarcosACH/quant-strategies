@@ -9,7 +9,7 @@ setup(
     long_description_content_type="text/markdown",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
-    python_requires=">=3.8",
+    python_requires=">=3.10",
     install_requires=[
         "pandas>=1.5.0",
         "numpy>=1.21.0",
@@ -42,14 +42,8 @@ setup(
         "Intended Audience :: Financial and Insurance Industry",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
     ],
-    entry_points={
-        "console_scripts": [
-            "backtest-strategy=scripts.backtesting.run_backtest:main",
-            "optimize-strategy=scripts.optimization.run_optimization:main",
-        ],
-    },
 )
