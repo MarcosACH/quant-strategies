@@ -49,10 +49,12 @@ def example_grid_search():
     )
 
     results = runner.run_backtest(
+        data_type="train",
         param_ranges=param_ranges_small,
         method="grid",
         optimization_metric="sharpe_ratio",
-        save_results=True
+        save_results=True,
+        auto_confirm=True
     )
 
     return results
@@ -82,11 +84,13 @@ def example_random_search():
     )
 
     results = runner.run_backtest(
+        data_type="train",
         param_ranges=param_ranges_small,
         method="random",
         optimization_metric="sharpe_ratio",
         n_iter=100,
-        save_results=True
+        save_results=True,
+        auto_confirm=True
     )
 
     return results
@@ -116,11 +120,13 @@ def example_bayesian_optimization():
     )
 
     results = runner.run_backtest(
+        data_type="train",
         param_ranges=param_ranges_small,
         method="bayesian",
         optimization_metric="sharpe_ratio",
         n_iter=50,
-        save_results=True
+        save_results=True,
+        auto_confirm=True
     )
 
     return results
@@ -165,9 +171,11 @@ def compare_optimization_methods():
         print(f"\nRunning {method.upper()} optimization...")
 
         results = runner.run_backtest(
+            data_type="train",
             param_ranges=param_ranges_small,
             method=method,
             optimization_metric="sharpe_ratio",
+            auto_confirm=True,
             **kwargs
         )
 
