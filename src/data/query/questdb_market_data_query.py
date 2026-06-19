@@ -10,6 +10,8 @@ from typing import Optional, List
 import polars as pl
 from polars import col
 
+from config.settings import settings
+
 
 class QuestDBMarketDataQuery:
     """
@@ -20,16 +22,18 @@ class QuestDBMarketDataQuery:
     """
 
     def __init__(self,
-                 host: str = "ec2-44-202-48-168.compute-1.amazonaws.com",
-                 port: int = 8812
+                 host: Optional[str] = None,
+                 port: Optional[int] = None
                  ):
         """
         Initialize QuestDB query service.
 
         Args:
-            host: QuestDB host address
-            port: QuestDB PostgreSQL port (default: 8812)
+            host: QuestDB host address (defaults to settings.QUESTDB_HOST / $QUESTDB_HOST)
+            port: QuestDB PostgreSQL port (defaults to settings.QUESTDB_PG_PORT / $QUESTDB_PG_PORT)
         """
+        host = host or settings.QUESTDB_HOST
+        port = port or settings.QUESTDB_PG_PORT
         self.connection_uri = f"redshift://admin:quest@{host}:{port}/qdb"
 
     def get_market_data(
