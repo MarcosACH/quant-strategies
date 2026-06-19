@@ -66,15 +66,19 @@ port `9000`; backtest queries read from the PostgreSQL-wire port `8812`.
 
 #### 4. Ingest market data
 
-Pull historical candles from OKX into QuestDB for the example's window (2022). From the project
-root:
+Pull historical 1-minute candles from OKX into QuestDB. From the project root, this ingests
+2022 Q1 (~130k candles, a couple of minutes) — enough for the example below:
 
 ```bash
-python -c "import asyncio; from scripts.data_ingestion.questdb_data_ingestion import main; asyncio.run(main(symbol='BTC-USDT-SWAP', from_date='2022-01-01', to_date='2023-01-01'))"
+python -c "import asyncio; from scripts.data_ingestion.questdb_data_ingestion import main; asyncio.run(main(symbol='BTC-USDT-SWAP', from_date='2022-01-01', to_date='2022-04-01'))"
 ```
 
-This takes a few minutes and stores candles in the `ohlcv` table. (CVD is derived from OHLCV at
-backtest time, so no extra data is needed.)
+Candles land in the `ohlcv` table. (CVD is derived from OHLCV at backtest time, so no extra data
+is needed.)
+
+> **Rate limits.** OKX's public `history-candles` endpoint throttles aggressively. Ingesting in
+> windows of a few months at a time is reliable; very large pulls (e.g. a full year in one call)
+> can trip HTTP 429. Run the command again with later dates to extend coverage.
 
 #### 5. Run the backtest
 
@@ -85,6 +89,10 @@ python scripts/backtesting/run_cvd_bb_backtest.py
 It runs a grid search and prints the top strategies by Sharpe ratio; the best parameters are saved
 to `results/best_params/`. Edit the `__main__` block of that script to switch between grid / random
 / Bayesian search.
+
+> **Note.** Grid search runs single-threaded by default (`MAX_PARALLEL_JOBS=1`) to stay memory-safe
+> during numba compilation. On a machine with spare RAM, raise it in `.env` to parallelize. Also
+> ensure the script's date range falls within the window you ingested in step 4.
 
 #### Or call it from your own code
 
@@ -110,7 +118,7 @@ runner = BacktestRunner(
     QuestDBMarketDataQuery(),
     symbol="BTC-USDT-SWAP",
     start_date="2022-01-01",
-    end_date="2022-12-31",
+    end_date="2022-04-01",   # match the window you ingested in step 4
     timeframe="1h",
     initial_cash=1000,
     fee_pct=0.05,
