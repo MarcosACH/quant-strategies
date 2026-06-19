@@ -131,12 +131,14 @@ class BacktestRunner:
         self.config_name = config_name or f"{symbol.lower().replace('-', '_')}_{timeframe}_{start_date.replace('-', '')}_{end_date.replace('-', '')}"
         self.description = description or f"{symbol} {timeframe} data from {start_date} to {end_date}"
 
-    def load_data(self, data_type: Literal['train', 'validation', 'test']) -> pl.DataFrame:
+    def load_data(self, data_type: Literal['train', 'validation', 'test'], auto_confirm: bool = False) -> pl.DataFrame:
         """
         Load data from QuestDB.
 
         Args:
             data_type: The type of data to load ('train', 'validation', 'test').
+            auto_confirm: Skip the interactive confirmation prompt (also skipped
+                automatically when stdin is not a TTY, e.g. scripts and notebooks).
 
         Returns:
             DataFrame containing the requested dataset
@@ -171,11 +173,12 @@ class BacktestRunner:
 
         print("\nREADY TO PREPARE DATA")
         print("This will collect and process the data from the data base.")
-        response = input("Continue? (y/N): ").strip().lower()
 
-        if response != 'y':
-            print("Operation cancelled.")
-            return
+        if not auto_confirm and sys.stdin.isatty():
+            response = input("Continue? (y/N): ").strip().lower()
+            if response != 'y':
+                print("Operation cancelled.")
+                return
 
         pipeline = DataPreparationPipeline(data_config)
 
@@ -193,7 +196,8 @@ class BacktestRunner:
                      method: str = "grid",
                      optimization_metric: str = "sharpe_ratio",
                      n_iter: int = 100,
-                     save_results: bool = True) -> pl.DataFrame:
+                     save_results: bool = True,
+                     auto_confirm: bool = False) -> pl.DataFrame:
         """
         Run backtest with specified optimization method.
 
@@ -217,7 +221,7 @@ class BacktestRunner:
         if data_type not in ['train', 'validation', 'test']:
             raise ValueError(f"Unknown data type: {data_type}")
         else:
-            data = self.load_data(data_type)
+            data = self.load_data(data_type, auto_confirm=auto_confirm)
 
         engine = VectorBTEngine(
             initial_cash=self.initial_cash,
